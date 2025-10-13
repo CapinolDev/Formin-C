@@ -7,7 +7,7 @@ program Engine
     integer :: nMoves, showChoices, ios, showValidator
 
 
-
+    
 
     showValidator = 0
     
@@ -18,6 +18,7 @@ program Engine
 
 
     call system('clear')   
+
 
     call initBoard(board)
 
@@ -52,9 +53,11 @@ program Engine
             if (showChoices == 1) then
                 call genPawnMovesW(board, file, rank, legalMoves, nMoves)
                 call genKingMovesW(board, file, rank, legalMoves, nMoves)
+                call genKnightMovesW(board, file, rank, legalMoves, nMoves)
             elseif ( showChoices == 2 ) then
                 call genPawnMovesB(board, file, rank, legalMoves, nMoves)
                 call genKingMovesB(board, file, rank, legalMoves, nMoves)
+                call genKnightMovesB(board, file, rank, legalMoves, nMoves)
             end if
             
             
@@ -264,7 +267,7 @@ contains
         end do
     end subroutine genKingMovesW
 
-        subroutine genKingMovesB(gameBoard, fileK, rankK, legalMoves, numMoves)
+    subroutine genKingMovesB(gameBoard, fileK, rankK, legalMoves, numMoves)
         implicit none
         character(len=1), intent(in) :: gameBoard(8,8)
         integer, intent(in) :: fileK, rankK
@@ -300,5 +303,82 @@ contains
             end do
         end do
     end subroutine genKingMovesB
+
+    subroutine genKnightMovesW(gameBoard, fileN, rankN, legalMoves, numMoves)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        integer, intent(in) :: fileN, rankN
+        character(len=5), intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: numMoves
+        integer :: maxMoves
+        integer, parameter :: nOffsets = 8
+        integer :: i, newFile, newRank
+        integer, dimension(nOffsets) :: df = (/  1,  2,  2,  1, -1, -2, -2, -1 /)
+        integer, dimension(nOffsets) :: dr = (/  2,  1, -1, -2, -2, -1,  1,  2 /)
+        character :: fromFile, fromRank, toFile, toRank
+
+        maxMoves = size(legalMoves)
+
+        if (gameBoard(rankN, fileN) /= 'N') return
+
+        fromFile = achar(iachar('a') + fileN - 1)
+        fromRank = achar(iachar('0') + rankN)
+
+        do i = 1, nOffsets
+            newFile = fileN + df(i)
+            newRank = rankN + dr(i)
+
+            if (newFile >= 1 .and. newFile <= 8 .and. newRank >= 1 .and. newRank <= 8) then
+                
+                if (.not.(gameBoard(newRank, newFile) >= 'A' .and. gameBoard(newRank, newFile) <= 'Z')) then
+                    if (numMoves < maxMoves) then
+                        numMoves = numMoves + 1
+                        toFile = achar(iachar('a') + newFile - 1)
+                        toRank = achar(iachar('0') + newRank)
+                        legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                    end if
+                end if
+            end if
+        end do
+    end subroutine genKnightMovesW
+
+
+    subroutine genKnightMovesB(gameBoard, fileN, rankN, legalMoves, numMoves)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        integer, intent(in) :: fileN, rankN
+        character(len=5), intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: numMoves
+        integer :: maxMoves
+        integer, parameter :: nOffsets = 8
+        integer :: i, newFile, newRank
+        integer, dimension(nOffsets) :: df = (/  1,  2,  2,  1, -1, -2, -2, -1 /)
+        integer, dimension(nOffsets) :: dr = (/  2,  1, -1, -2, -2, -1,  1,  2 /)
+        character :: fromFile, fromRank, toFile, toRank
+
+        maxMoves = size(legalMoves)
+
+        if (gameBoard(rankN, fileN) /= 'n') return
+
+        fromFile = achar(iachar('a') + fileN - 1)
+        fromRank = achar(iachar('0') + rankN)
+
+        do i = 1, nOffsets
+            newFile = fileN + df(i)
+            newRank = rankN + dr(i)
+
+            if (newFile >= 1 .and. newFile <= 8 .and. newRank >= 1 .and. newRank <= 8) then
+                
+                if (.not.(gameBoard(newRank, newFile) >= 'a' .and. gameBoard(newRank, newFile) <= 'z')) then
+                    if (numMoves < maxMoves) then
+                        numMoves = numMoves + 1
+                        toFile = achar(iachar('a') + newFile - 1)
+                        toRank = achar(iachar('0') + newRank)
+                        legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                    end if
+                end if
+            end if
+        end do
+    end subroutine genKnightMovesB
 
 end program Engine

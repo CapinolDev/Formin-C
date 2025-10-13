@@ -5,24 +5,57 @@ program Engine
     integer :: rank, file
     character(len=5) :: legalMoves(218)
     integer :: nMoves, showChoices, ios, showValidator
+    integer :: playerSelectValidator
+    character(len=5) :: selectedPlayer
+    real :: randHelper
 
 
-    
 
     showValidator = 0
     
     nMoves = 0
     board = ' '
     showChoices = 0
+    playerSelectValidator = 0
+
+    do while (playerSelectValidator ==  0)
+        call system('clear')   
+
+        print*,'Which color do you want to be?'
+        print*,'1. White'
+        print*,'2. Black'
+        print*,'3. Random'
+        read(*,*,IOSTAT = ios) playerSelectValidator
+        if (ios /= 0 .or. playerSelectValidator < 1 .or. playerSelectValidator > 3) then
+            print*, 'Invalid input - please input an int between 1 and 3'
+            playerSelectValidator = 0
+        else
+            select case (playerSelectValidator)
+                case (1)
+                    selectedPlayer = 'White'
+                case (2)
+                    selectedPlayer ='Black'
+                case (3)
+                    call random_number(randHelper)
+                    playerSelectValidator = floor(randHelper*2+1)
+                    select case (playerSelectValidator)
+                        case (1)
+                            selectedPlayer = 'White'
+                        case (2)
+                            selectedPlayer ='Black'
+                        end select
+            end select
+        end if
+
+    end do
     
+    call system('clear')
 
-
-    call system('clear')   
-
+    print*, 'You are ',selectedPlayer
 
     call initBoard(board)
 
-
+    
 
     do rank = 8, 1, -1
         write(*,'(A)', advance='no') trim(adjustl(itoa(rank))) // " | "
@@ -35,30 +68,24 @@ program Engine
 
     print*, '   a b c d e f g h'
 
-    do while (showValidator == 0)
-        print *, 'Which sides moves do you want to display?'
-        print *, '1. White'
-        print *, '2. Black'
-        print *, '3. None'
-        read(*,*, IOSTAT = ios) showChoices
-        if (ios /= 0 .or. showChoices < 1 .or. showChoices > 3) then
-            print *, 'Invalid Input - Please input an int between 1 and 3.'
-        else
-            showValidator = 1
-        end if
-    end do
 
     do file = 1,8
         do rank = 1, 8
-            if (showChoices == 1) then
+            
                 call genPawnMovesW(board, file, rank, legalMoves, nMoves)
                 call genKingMovesW(board, file, rank, legalMoves, nMoves)
                 call genKnightMovesW(board, file, rank, legalMoves, nMoves)
-            elseif ( showChoices == 2 ) then
+                call genRookMovesW(board, file, rank, legalMoves, nMoves)
+                call genBishopMovesW(board, file, rank, legalMoves, nMoves)
+                call genQueenMovesW(board, file, rank, legalMoves, nMoves)
+            
                 call genPawnMovesB(board, file, rank, legalMoves, nMoves)
                 call genKingMovesB(board, file, rank, legalMoves, nMoves)
                 call genKnightMovesB(board, file, rank, legalMoves, nMoves)
-            end if
+                call genRookMovesB(board, file, rank, legalMoves, nMoves)
+                call genBishopMovesB(board, file, rank, legalMoves, nMoves)
+                call genQueenMovesB(board, file, rank, legalMoves, nMoves)
+            
             
             
             
@@ -66,10 +93,7 @@ program Engine
 
     end do
 
-    print*, 'Legal moves (', nMoves, '):'
-    do rank = 1, nMoves
-        print*, legalMoves(rank)
-    end do
+    
 
 contains
 
@@ -78,6 +102,7 @@ contains
         character(len=2) :: s
         write(s,'(I1)') i
     end function itoa
+
 
 
     subroutine initBoard(board)
@@ -93,6 +118,16 @@ contains
 
     end subroutine initBoard
 
+    subroutine makeMove(board, currentFile, currentRank, goalFile, goalRank, piece)
+        character(len=1), intent(out) :: board(8,8)
+        integer, intent(in) :: currentFile, currentRank, goalFile, goalRank
+        character(len=1), intent(in) :: piece
+
+        board(currentRank, currentFile) = ''
+        board(goalRank, goalFile) = piece
+               
+
+    end subroutine makeMove
 
     subroutine genPawnMovesW(gameBoard, fileP, rankP, legalMoves, numMoves)
         implicit none
@@ -100,9 +135,8 @@ contains
         integer, intent(in) :: fileP, rankP
         character(len=5), intent(inout) :: legalMoves(:)
         integer, intent(inout) :: numMoves
-        integer :: nextRank
+        integer :: nextRank, maxMoves
         character :: fileChar, rankChar, nextRankChar
-        integer :: maxMoves
 
         maxMoves = size(legalMoves)
 
@@ -380,5 +414,186 @@ contains
             end if
         end do
     end subroutine genKnightMovesB
+    
+    subroutine genRookMovesW(gameBoard, fileR, rankR, legalMoves, numMoves)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        integer, intent(in) :: fileR, rankR
+        character(len=5), intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: numMoves
+        integer :: df, dr, newFile, newRank
+        character :: fromFile, fromRank, toFile, toRank
+        integer :: maxMoves
+
+        maxMoves = size(legalMoves)
+        if (gameBoard(rankR, fileR) /= 'R') return
+
+        fromFile = achar(iachar('a') + fileR - 1)
+        fromRank = achar(iachar('0') + rankR)
+
+        do df = -1, 1, 2
+            newFile = fileR
+            do
+                newFile = newFile + df
+                if (newFile < 1 .or. newFile > 8) exit
+                if (gameBoard(rankR, newFile) >= 'A' .and. gameBoard(rankR, newFile) <= 'Z') exit
+                numMoves = numMoves + 1
+                toFile = achar(iachar('a') + newFile - 1)
+                toRank = fromRank
+                legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                if (gameBoard(rankR, newFile) >= 'a' .and. gameBoard(rankR, newFile) <= 'z') exit
+            end do
+        end do
+
+        do dr = -1, 1, 2
+            newRank = rankR
+            do
+                newRank = newRank + dr
+                if (newRank < 1 .or. newRank > 8) exit
+                if (gameBoard(newRank, fileR) >= 'A' .and. gameBoard(newRank, fileR) <= 'Z') exit
+                numMoves = numMoves + 1
+                toFile = fromFile
+                toRank = achar(iachar('0') + newRank)
+                legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                if (gameBoard(newRank, fileR) >= 'a' .and. gameBoard(newRank, fileR) <= 'z') exit
+            end do
+        end do
+    end subroutine genRookMovesW
+
+    subroutine genRookMovesB(gameBoard, fileR, rankR, legalMoves, numMoves)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        integer, intent(in) :: fileR, rankR
+        character(len=5), intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: numMoves
+        integer :: df, dr, newFile, newRank
+        character :: fromFile, fromRank, toFile, toRank
+        integer :: maxMoves
+
+        maxMoves = size(legalMoves)
+        if (gameBoard(rankR, fileR) /= 'r') return
+
+        fromFile = achar(iachar('a') + fileR - 1)
+        fromRank = achar(iachar('0') + rankR)
+
+        do df = -1, 1, 2
+            newFile = fileR
+            do
+                newFile = newFile + df
+                if (newFile < 1 .or. newFile > 8) exit
+                if (gameBoard(rankR, newFile) >= 'a' .and. gameBoard(rankR, newFile) <= 'z') exit
+                numMoves = numMoves + 1
+                toFile = achar(iachar('a') + newFile - 1)
+                toRank = fromRank
+                legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                if (gameBoard(rankR, newFile) >= 'A' .and. gameBoard(rankR, newFile) <= 'Z') exit
+            end do
+        end do
+
+        do dr = -1, 1, 2
+            newRank = rankR
+            do
+                newRank = newRank + dr
+                if (newRank < 1 .or. newRank > 8) exit
+                if (gameBoard(newRank, fileR) >= 'a' .and. gameBoard(newRank, fileR) <= 'z') exit
+                numMoves = numMoves + 1
+                toFile = fromFile
+                toRank = achar(iachar('0') + newRank)
+                legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                if (gameBoard(newRank, fileR) >= 'A' .and. gameBoard(newRank, fileR) <= 'Z') exit
+            end do
+        end do
+    end subroutine genRookMovesB
+
+    subroutine genBishopMovesW(gameBoard, fileB, rankB, legalMoves, numMoves)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        integer, intent(in) :: fileB, rankB
+        character(len=5), intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: numMoves
+        integer :: df, dr, newFile, newRank
+        character :: fromFile, fromRank, toFile, toRank
+        integer :: maxMoves
+
+        maxMoves = size(legalMoves)
+        if (gameBoard(rankB, fileB) /= 'B') return
+
+        fromFile = achar(iachar('a') + fileB - 1)
+        fromRank = achar(iachar('0') + rankB)
+
+        do df = -1, 1, 2
+            do dr = -1, 1, 2
+                newFile = fileB
+                newRank = rankB
+                do
+                    newFile = newFile + df
+                    newRank = newRank + dr
+                    if (newFile < 1 .or. newFile > 8 .or. newRank < 1 .or. newRank > 8) exit
+                    if (gameBoard(newRank, newFile) >= 'A' .and. gameBoard(newRank, newFile) <= 'Z') exit
+                    numMoves = numMoves + 1
+                    toFile = achar(iachar('a') + newFile - 1)
+                    toRank = achar(iachar('0') + newRank)
+                    legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                    if (gameBoard(newRank, newFile) >= 'a' .and. gameBoard(newRank, newFile) <= 'z') exit
+                end do
+            end do
+        end do
+    end subroutine genBishopMovesW
+
+    subroutine genBishopMovesB(gameBoard, fileB, rankB, legalMoves, numMoves)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        integer, intent(in) :: fileB, rankB
+        character(len=5), intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: numMoves
+        integer :: df, dr, newFile, newRank
+        character :: fromFile, fromRank, toFile, toRank
+        integer :: maxMoves
+
+        maxMoves = size(legalMoves)
+        if (gameBoard(rankB, fileB) /= 'B') return
+
+        fromFile = achar(iachar('a') + fileB - 1)
+        fromRank = achar(iachar('0') + rankB)
+
+        do df = -1, 1, 2
+            do dr = -1, 1, 2
+                newFile = fileB
+                newRank = rankB
+                do
+                    newFile = newFile + df
+                    newRank = newRank + dr
+                    if (newFile < 1 .or. newFile > 8 .or. newRank < 1 .or. newRank > 8) exit
+                    if (gameBoard(newRank, newFile) >= 'a' .and. gameBoard(newRank, newFile) <= 'z') exit
+                    numMoves = numMoves + 1
+                    toFile = achar(iachar('a') + newFile - 1)
+                    toRank = achar(iachar('0') + newRank)
+                    legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                    if (gameBoard(newRank, newFile) >= 'A' .and. gameBoard(newRank, newFile) <= 'Z') exit
+                end do
+            end do
+        end do
+    end subroutine genBishopMovesB
+    subroutine genQueenMovesW(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        integer, intent(in) :: fileQ, rankQ
+        character(len=5), intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: numMoves
+
+        call genRookMovesW(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+        call genBishopMovesW(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+    end subroutine genQueenMovesW
+
+    subroutine genQueenMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        integer, intent(in) :: fileQ, rankQ
+        character(len=5), intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: numMoves
+        call genRookMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+        call genBishopMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+    end subroutine genQueenMovesB
+
 
 end program Engine

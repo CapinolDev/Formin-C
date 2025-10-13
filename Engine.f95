@@ -4,13 +4,23 @@ program Engine
     character(len=1) :: board(8,8)
     integer :: rank, file
     character(len=5) :: legalMoves(218)
-    integer :: nMoves
+    integer :: nMoves, showChoices, ios, showValidator
+
+
+
+
+    showValidator = 0
+    
     nMoves = 0
     board = ' '
+    showChoices = 0
+    
 
-    call system('clear')
+
+    call system('clear')   
 
     call initBoard(board)
+
 
 
     do rank = 8, 1, -1
@@ -22,20 +32,38 @@ program Engine
         if (rank > 1) print*, '  ----------------'
     end do
 
-    print*, "   a b c d e f g h"
+    print*, '   a b c d e f g h'
 
+    do while (showValidator == 0)
+        print *, 'Which sides moves do you want to display?'
+        print *, '1. White'
+        print *, '2. Black'
+        print *, '3. None'
+        read(*,*, IOSTAT = ios) showChoices
+        if (ios /= 0 .or. showChoices < 1 .or. showChoices > 3) then
+            print *, 'Invalid Input - Please input an int between 1 and 3.'
+        else
+            showValidator = 1
+        end if
+    end do
 
     do file = 1,8
         do rank = 1, 8
-            call genPawnMovesW(board, file, rank, legalMoves, nMoves)
-            call genPawnMovesB(board, file, rank, legalMoves, nMoves)
-            call genKingMovesW(board, file, rank, legalMoves, nMoves)
-            call genKingMovesB(board, file, rank, legalMoves, nMoves)
+            if (showChoices == 1) then
+                call genPawnMovesW(board, file, rank, legalMoves, nMoves)
+                call genKingMovesW(board, file, rank, legalMoves, nMoves)
+            elseif ( showChoices == 2 ) then
+                call genPawnMovesB(board, file, rank, legalMoves, nMoves)
+                call genKingMovesB(board, file, rank, legalMoves, nMoves)
+            end if
+            
+            
+            
         end do
 
     end do
 
-    print*, "Legal moves (", nMoves, "):"
+    print*, 'Legal moves (', nMoves, '):'
     do rank = 1, nMoves
         print*, legalMoves(rank)
     end do

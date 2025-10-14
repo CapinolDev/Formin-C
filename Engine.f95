@@ -4,13 +4,17 @@ program Engine
     character(len=1) :: board(8,8)
     integer :: rank, file
     character(len=5) :: legalMoves(218)
-    integer :: nMoves, showChoices, ios, showValidator
+    integer :: nMoves, showChoices, ios, showValidator, moveInputValidator
     integer :: playerSelectValidator
     character(len=5) :: selectedPlayer
     real :: randHelper, posEval
+    character(len=5) :: userMove
+    integer :: cf, cr, gf, gr
+    logical :: valid, game
 
 
-
+    game = .true.
+    moveInputValidator = 0
     showValidator = 0
     nMoves = 0
     board = ' '
@@ -47,53 +51,75 @@ program Engine
         end if
 
     end do
-    
-    call system('clear')
-
-    print*, 'You are ',selectedPlayer
-
     call initBoard(board)
+    do while (game)
+        call system('clear')
+        moveInputValidator = 0
+        print*, 'You are ',selectedPlayer
 
-    
+        
 
-    do rank = 8, 1, -1
-        write(*,'(A)', advance='no') trim(adjustl(itoa(rank))) // " | "
-        do file = 1,8
-            write(*,'(A)', advance='no') board(rank,file) // ' '
+        
+
+        do rank = 8, 1, -1
+            write(*,'(A)', advance='no') trim(adjustl(itoa(rank))) // " | "
+            do file = 1,8
+                write(*,'(A)', advance='no') board(rank,file) // ' '
+            end do
+            print*
+            if (rank > 1) print*, '  ----------------'
         end do
-        print*
-        if (rank > 1) print*, '  ----------------'
-    end do
 
-    print*, '   a b c d e f g h'
+        print*, '   a b c d e f g h'
 
-    call evalPos(board, posEval)
+        nMoves = 0
+        legalMoves = ''
 
-    print*, posEval
-
-    do file = 1,8
-        do rank = 1, 8
-            
+        do file = 1,8
+            do rank = 1,8
+                
                 call genPawnMovesW(board, file, rank, legalMoves, nMoves)
                 call genKingMovesW(board, file, rank, legalMoves, nMoves)
-                call genKnightMovesW(board, file, rank, legalMoves, nMoves)
+                call genKnightMovesW(board, file, rank, legalMoves, nMoves)                    
                 call genRookMovesW(board, file, rank, legalMoves, nMoves)
                 call genBishopMovesW(board, file, rank, legalMoves, nMoves)
-                call genQueenMovesW(board, file, rank, legalMoves, nMoves)
-            
+                call genQueenMovesW(board, file, rank, legalMoves, nMoves)          
+                
                 call genPawnMovesB(board, file, rank, legalMoves, nMoves)
                 call genKingMovesB(board, file, rank, legalMoves, nMoves)
                 call genKnightMovesB(board, file, rank, legalMoves, nMoves)
                 call genRookMovesB(board, file, rank, legalMoves, nMoves)
-                call genBishopMovesB(board, file, rank, legalMoves, nMoves)
+                call genBishopMovesB(board, file, rank, legalMoves, nMoves)                    
                 call genQueenMovesB(board, file, rank, legalMoves, nMoves)
-            
-            
-            
-            
+                              
+            end do
+
+        end do
+
+        call evalPos(board, posEval)
+        print*, posEval
+
+        do while (moveInputValidator == 0)
+
+            print*, 'Enter your move (e.g., e2e4):'
+            read(*,'(A)') userMove
+
+            call parseMoveAndValidate(trim(userMove), legalMoves, nMoves, cf, cr, gf, gr, valid)
+
+            if (valid) then
+                print*, 'Move accepted:', trim(userMove)
+                call makeMove(board, cf, cr, gf, gr, board(cr, cf))
+                moveInputValidator = 1
+            else
+                print*, 'Invalid or illegal move! Try again.'
+            end if
         end do
 
     end do
+
+    
+
+
 
     
 
@@ -125,11 +151,57 @@ contains
         integer, intent(in) :: currentFile, currentRank, goalFile, goalRank
         character(len=1), intent(in) :: piece
 
-        board(currentRank, currentFile) = ''
+        board(currentRank, currentFile) = ' '
         board(goalRank, goalFile) = piece
                
            
     end subroutine makeMove
+
+    subroutine parseMoveAndValidate(move, legalMoves, nMoves, currentFile, currentRank, goalFile, goalRank, isValid)
+        implicit none
+        character(len=*), intent(in) :: move
+        character(len=5), intent(in) :: legalMoves(:)
+        integer, intent(in) :: nMoves
+        integer, intent(out) :: currentFile, currentRank, goalFile, goalRank
+        logical, intent(out) :: isValid
+
+        character :: c1, c2, c3, c4
+        integer :: i
+
+        isValid = .false.
+        currentFile = 0
+        currentRank = 0
+        goalFile = 0
+        goalRank = 0
+
+        if (len_trim(move) < 4) return
+
+        c1 = move(1:1)
+        c2 = move(2:2)
+        c3 = move(3:3)
+        c4 = move(4:4)
+
+        if (c1 < 'a' .or. c1 > 'h') return
+        if (c3 < 'a' .or. c3 > 'h') return
+        if (c2 < '1' .or. c2 > '8') return
+        if (c4 < '1' .or. c4 > '8') return
+
+        currentFile = iachar(c1) - iachar('a') + 1
+        goalFile    = iachar(c3) - iachar('a') + 1
+
+        read(c2, '(I1)') currentRank
+        read(c4, '(I1)') goalRank
+
+        do i = 1, nMoves
+            if (trim(legalMoves(i)) == trim(move)) then
+                isValid = .true.
+                exit
+            end if
+        end do
+    end subroutine parseMoveAndValidate
+
+
+
 
     subroutine evalPos(board, posEval)
         character(len=1), intent(in) :: board(8,8)
@@ -179,9 +251,12 @@ contains
 
         maxMoves = size(legalMoves)
 
-        if (gameBoard(rankP, fileP) /= 'P') return
+        
 
+        if (gameBoard(rankP, fileP) /= 'P') return
+        
         nextRank = rankP + 1
+        
         if (nextRank <= 8) then
 
             if (fileP > 1) then
@@ -195,7 +270,7 @@ contains
                     end if
                 end if
             end if
-
+            
             if (fileP < 8) then
                 if (gameBoard(nextRank, fileP+1) >= 'a' .and. gameBoard(nextRank, fileP+1) <= 'z') then
                     if (numMoves < maxMoves) then

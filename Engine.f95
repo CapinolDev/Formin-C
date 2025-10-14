@@ -108,13 +108,13 @@ program Engine
 
             if (valid) then
                 print*, 'Move accepted:', trim(userMove)
+       
                 call makeMove(board, cf, cr, gf, gr, board(cr, cf))
                 moveInputValidator = 1
             else
                 print*, 'Invalid or illegal move! Try again.'
             end if
         end do
-
     end do
 
     
@@ -147,12 +147,13 @@ contains
     end subroutine initBoard
 
     subroutine makeMove(board, currentFile, currentRank, goalFile, goalRank, piece)
-        character(len=1), intent(out) :: board(8,8)
+        character(len=1), intent(inout) :: board(8,8)
         integer, intent(in) :: currentFile, currentRank, goalFile, goalRank
-        character(len=1), intent(in) :: piece
+        character(len=1), intent(inout) :: piece
 
-        board(currentRank, currentFile) = ' '
         board(goalRank, goalFile) = piece
+        board(currentRank, currentFile) = ' '
+        
                
            
     end subroutine makeMove

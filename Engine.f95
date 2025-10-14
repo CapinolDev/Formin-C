@@ -7,12 +7,11 @@ program Engine
     integer :: nMoves, showChoices, ios, showValidator
     integer :: playerSelectValidator
     character(len=5) :: selectedPlayer
-    real :: randHelper
+    real :: randHelper, posEval
 
 
 
     showValidator = 0
-    
     nMoves = 0
     board = ' '
     showChoices = 0
@@ -68,6 +67,9 @@ program Engine
 
     print*, '   a b c d e f g h'
 
+    call evalPos(board, posEval)
+
+    print*, posEval
 
     do file = 1,8
         do rank = 1, 8
@@ -126,8 +128,45 @@ contains
         board(currentRank, currentFile) = ''
         board(goalRank, goalFile) = piece
                
-
+           
     end subroutine makeMove
+
+    subroutine evalPos(board, posEval)
+        character(len=1), intent(in) :: board(8,8)
+        real, intent(inout) :: posEval
+        integer :: f, r
+        
+        do f = 1,8
+            do r = 1,8
+                select case (board(f,r))
+                    case ('P')
+                        posEval = posEval + 1
+                    case ('R')
+                        posEval = posEval + 4
+                    case ('B')
+                        posEval = posEval + 3
+                    case ('N')
+                        posEval = posEval + 3
+                    case ('Q')
+                        posEval = posEval + 8
+                    case ('p')
+                        posEval = posEval - 1
+                    case ('r')
+                        posEval = posEval - 4
+                    case ('b')
+                        posEval = posEval - 3
+                    case ('n')
+                        posEval = posEval - 3
+                    case ('q')
+                        posEval = posEval - 8
+
+
+                end select
+                
+            end do
+        end do
+    end  subroutine evalPos
+
 
     subroutine genPawnMovesW(gameBoard, fileP, rankP, legalMoves, numMoves)
         implicit none

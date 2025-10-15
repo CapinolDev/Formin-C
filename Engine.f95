@@ -6,7 +6,7 @@ program Engine
     character(len=5) :: legalMoves(218)
     integer :: nMoves, showChoices, ios, showValidator, moveInputValidator
     integer :: playerSelectValidator
-    character(len=5) :: selectedPlayer, playingPlayer
+    character(len=5) :: selectedPlayer, playingPlayer, engineColor
     real :: randHelper, posEval
     character(len=5) :: userMove, engineMove
     integer :: cf, cr, gf, gr
@@ -50,16 +50,20 @@ program Engine
             select case (playerSelectValidator)
                 case (1)
                     selectedPlayer = 'White'
+                    engineColor = 'Black'
                 case (2)
                     selectedPlayer ='Black'
+                    engineColor = 'White'
                 case (3)
                     call random_number(randHelper)
                     playerSelectValidator = floor(randHelper*2+1)
                     select case (playerSelectValidator)
                         case (1)
                             selectedPlayer = 'White'
+                            engineColor = 'Black'
                         case (2)
                             selectedPlayer ='Black'
+                            engineColor = 'White'
                         end select
             end select
         end if
@@ -68,9 +72,11 @@ program Engine
     call initBoard(board)
     do while (game)
         call system(osClear)
+    
         posEval = 0
         moveInputValidator = 0
         print*, 'You are ',selectedPlayer
+        print*, 'Engine played ',engineMove
 
         
 
@@ -138,14 +144,15 @@ program Engine
             end do
 
         else 
-            call pickRandomMove(legalMoves, nMoves,engineMove)        
+            call lookIntoFuture(board, legalMoves, nMoves, engineMove, engineColor)
+
             call parseMoveAndValidate(trim(engineMove), legalMoves, nMoves, cf, cr, gf, gr, valid)
+
             if (valid) then
                 call makeMove(board, cf, cr, gf, gr, board(cr, cf))
             else
-                print *, 'Engine move failed (this should not happen)'
+                print*, 'Engine attempted invalid move! This should not happen.'
             end if
-            
             if (playingPlayer == 'White') then
                 playingPlayer = 'Black'
             else
@@ -296,7 +303,58 @@ contains
         end do
     end  subroutine evalPos
 
-    
+    subroutine lookIntoFuture(gameBoard, legalMoves, nMoves, engineMove, engineColor)
+    implicit none
+    character(len=1), intent(inout) :: gameBoard(8,8)
+    character(len=5), intent(in) :: legalMoves(:)
+    integer, intent(in) :: nMoves
+    character(len=5), intent(inout) :: engineMove
+    character(len=5), intent(in) :: engineColor
+
+    character(len=5) :: candidateMove
+    character(len=1) :: tempBoard(8,8)
+    integer :: cf, cr, gf, gr, i
+    logical :: valid
+    real :: posEval, bestPosEval
+    character(len=1) :: pieceToMove
+ 
+    tempBoard = gameBoard
+
+    if (engineColor == 'White') then
+        bestPosEval = -1.0e6
+    else
+        bestPosEval =  1.0e6 
+    end if
+
+    engineMove = ''
+
+    do i = 1, nMoves
+        candidateMove = legalMoves(i)
+        call parseMoveAndValidate(trim(candidateMove), legalMoves, nMoves, cf, cr, gf, gr, valid)
+        if (.not. valid) cycle
+
+        pieceToMove = gameBoard(cr, cf)
+
+        tempBoard = gameBoard
+        call makeMove(tempBoard, cf, cr, gf, gr, pieceToMove)
+
+        posEval = 0.0
+        call evalPos(tempBoard, posEval)
+
+        if (engineColor == 'White') then
+            if (posEval > bestPosEval) then
+                bestPosEval = posEval
+                engineMove = candidateMove
+            end if
+        else
+            if (posEval < bestPosEval) then
+                bestPosEval = posEval
+                engineMove = candidateMove
+            end if
+        end if
+    end do
+end subroutine lookIntoFuture
+
 
     subroutine genPawnMovesW(gameBoard, fileP, rankP, legalMoves, numMoves)
         implicit none
@@ -721,7 +779,7 @@ contains
         integer :: maxMoves
 
         maxMoves = size(legalMoves)
-        if (gameBoard(rankB, fileB) /= 'B') return
+        if (gameBoard(rankB, fileB) /= 'b') return
 
         fromFile = achar(iachar('a') + fileB - 1)
         fromRank = achar(iachar('0') + rankB)

@@ -6,7 +6,7 @@ program Engine
     character(len=5) :: legalMoves(218)
     integer :: nMoves, showChoices, ios, showValidator, moveInputValidator
     integer :: playerSelectValidator
-    character(len=5) :: selectedPlayer, playingPlayer, engineColor
+    character(len=5) :: selectedPlayer, playingPlayer, engineColor, winningPlayer
     real :: randHelper, posEval
     character(len=5) :: userMove, engineMove
     integer :: cf, cr, gf, gr
@@ -17,7 +17,6 @@ program Engine
 
 
     
-
     playingPlayer = 'White'
     game = .true.
     moveInputValidator = 0
@@ -71,6 +70,7 @@ program Engine
     end do
     call initBoard(board)
     do while (game)
+        
         call system(osClear)
     
         posEval = 0
@@ -117,7 +117,11 @@ program Engine
             end do
 
         end do
-
+        call filterLegalMoves(board, legalMoves, nMoves, playingPlayer)
+        if (nMoves <= 0) then
+            game = .false.
+            
+        end if
         call evalPos(board, posEval)
         print*, posEval
         if (selectedPlayer == playingPlayer) then
@@ -161,7 +165,18 @@ program Engine
         end if
         
     end do
-        
+    if (game .eqv. .false.) then
+        call system (osClear)
+        do rank = 8, 1, -1
+            write(*,'(A)', advance='no') trim(adjustl(itoa(rank))) // " | "
+            do file = 1,8
+                write(*,'(A)', advance='no') board(rank,file) // ' '
+            end do
+            print*
+            if (rank > 1) print*, '  ----------------'
+        end do
+        print*, 'Game over.'
+    end if
         
    
 
@@ -264,7 +279,189 @@ contains
         end do
     end subroutine parseMoveAndValidate
 
+    subroutine isSquareAttacked(board, rk, fl, byColor, attacked)
+        implicit none
+        character(len=1), intent(in) :: board(8,8)
+        integer, intent(in) :: rk, fl
+        character(len=*), intent(in) :: byColor
+        logical, intent(out) :: attacked
 
+        integer :: r, f, nr, nf, i
+        integer, dimension(8) :: kdr = (/  2,  1, -1, -2, -2, -1,  1,  2 /)
+        integer, dimension(8) :: kdf = (/  1,  2,  2,  1, -1, -2, -2, -1 /)
+        integer, dimension(4) :: rdr = (/ 1,  1, -1, -1 /)
+        integer, dimension(4) :: rdf = (/ 1, -1, -1,  1 /)
+        integer, dimension(4) :: rcr = (/ 1, -1,  0,  0 /)
+        integer, dimension(4) :: rcf = (/ 0,  0,  1, -1 /)
+        character(len=1) :: pawnC, knightC, bishopC, rookC, queenC, kingC
+
+        attacked = .false.
+
+        if (trim(byColor) == 'White') then
+            pawnC   = 'P'
+            knightC = 'N'
+            bishopC = 'B'
+            rookC   = 'R'
+            queenC  = 'Q'
+            kingC   = 'K'
+            
+            if (rk-1 >= 1) then
+                if (fl-1 >= 1) then
+                    if (board(rk-1, fl-1) == pawnC) attacked = .true.
+                end if
+                if (.not. attacked .and. fl+1 <= 8) then
+                    if (board(rk-1, fl+1) == pawnC) attacked = .true.
+                end if
+            end if
+        else
+            pawnC   = 'p'
+            knightC = 'n'
+            bishopC = 'b'
+            rookC   = 'r'
+            queenC  = 'q'
+            kingC   = 'k'
+        
+            if (rk+1 <= 8) then
+                if (fl-1 >= 1) then
+                    if (board(rk+1, fl-1) == pawnC) attacked = .true.
+                end if
+                if (.not. attacked .and. fl+1 <= 8) then
+                    if (board(rk+1, fl+1) == pawnC) attacked = .true.
+                end if
+            end if
+        end if
+
+        if (attacked) return
+
+        do i = 1, 8
+            nr = rk + kdr(i)
+            nf = fl + kdf(i)
+            if (nr >= 1 .and. nr <= 8 .and. nf >= 1 .and. nf <= 8) then
+                if (board(nr, nf) == knightC) then
+                    attacked = .true.
+                    return
+                end if
+            end if
+        end do
+
+        do r = -1, 1
+            do f = -1, 1
+                if (r == 0 .and. f == 0) cycle
+                nr = rk + r
+                nf = fl + f
+                if (nr >= 1 .and. nr <= 8 .and. nf >= 1 .and. nf <= 8) then
+                    if (board(nr, nf) == kingC) then
+                        attacked = .true.
+                        return
+                    end if
+                end if
+            end do
+        end do
+
+        do i = 1, 4
+            nr = rk
+            nf = fl
+            do
+                nr = nr + rdr(i)
+                nf = nf + rdf(i)
+                if (nr < 1 .or. nr > 8 .or. nf < 1 .or. nf > 8) exit
+                if (board(nr, nf) == bishopC .or. board(nr, nf) == queenC) then
+                    attacked = .true.
+                    return
+                end if
+            
+                if (board(nr, nf) /= ' ') exit
+            end do
+        end do
+
+    
+        do i = 1, 4
+            nr = rk
+            nf = fl
+            do
+                nr = nr + rcr(i)
+                nf = nf + rcf(i)
+                if (nr < 1 .or. nr > 8 .or. nf < 1 .or. nf > 8) exit
+                if (board(nr, nf) == rookC .or. board(nr, nf) == queenC) then
+                    attacked = .true.
+                    return
+                end if
+                if (board(nr, nf) /= ' ') exit
+            end do
+        end do
+
+    end subroutine isSquareAttacked
+
+    subroutine isInCheck(board, color, inCheck)
+        implicit none
+        character(len=1), intent(in) :: board(8,8)
+        character(len=*), intent(in) :: color
+        logical, intent(out) :: inCheck
+        integer :: r, f
+        character(len=1) :: kingC
+
+        inCheck = .false.
+        if (trim(color) == 'White') then
+            kingC = 'K'
+        else
+            kingC = 'k'
+        end if
+
+        do r = 1, 8
+            do f = 1, 8
+                if (board(r,f) == kingC) then
+                    call isSquareAttacked(board, r, f, merge('Black','White', trim(color) == 'White'), inCheck)
+                    return
+                end if
+            end do
+        end do
+        
+        inCheck = .true.
+    end subroutine isInCheck
+
+    subroutine filterLegalMoves(gameBoard, legalMoves, nMoves, sideColor)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        character(len=5), intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: nMoves
+        character(len=*), intent(in) :: sideColor
+
+        character(len=5), allocatable :: tempIn(:)
+        character(len=5) :: keepMoves(size(legalMoves))
+        character(len=1) :: tempBoard(8,8)
+        integer :: oldN, i, cf, cr, gf, gr
+        logical :: valid, stillInCheck, keep
+        integer :: outIdx
+
+        oldN = nMoves
+        if (oldN <= 0) return
+
+        tempIn = legalMoves(1:oldN)
+        outIdx = 0
+
+        do i = 1, oldN
+            call parseMoveAndValidate(trim(tempIn(i)), tempIn, oldN, cf, cr, gf, gr, valid)
+            if (.not. valid) cycle
+
+            tempBoard = gameBoard
+            call makeMove(tempBoard, cf, cr, gf, gr, tempBoard(cr, cf))  
+            call isInCheck(tempBoard, sideColor, stillInCheck)
+            if (.not. stillInCheck) then
+                outIdx = outIdx + 1
+                keepMoves(outIdx) = tempIn(i)
+            end if
+        end do
+
+
+        do i = 1, size(legalMoves)
+            if (i <= outIdx) then
+                legalMoves(i) = keepMoves(i)
+            else
+                legalMoves(i) = ''
+            end if
+        end do
+        nMoves = outIdx
+    end subroutine filterLegalMoves
 
 
     subroutine evalPos(board, posEval)
@@ -802,16 +999,69 @@ end subroutine lookIntoFuture
             end do
         end do
     end subroutine genBishopMovesB
-    subroutine genQueenMovesW(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+  subroutine genQueenMovesW(gameBoard, fileQ, rankQ, legalMoves, numMoves)
         implicit none
         character(len=1), intent(in) :: gameBoard(8,8)
         integer, intent(in) :: fileQ, rankQ
         character(len=5), intent(inout) :: legalMoves(:)
         integer, intent(inout) :: numMoves
+        integer :: maxMoves
+        integer :: i, nr, nf
+        integer, dimension(4) :: ddr = (/  1,  1, -1, -1 /) 
+        integer, dimension(4) :: ddf = (/  1, -1, -1,  1 /) 
+        integer, dimension(4) :: rdr = (/  1, -1,  0,  0 /)
+        integer, dimension(4) :: rdf = (/  0,  0,  1, -1 /) 
+        character :: fromFile, fromRank, toFile, toRank
 
-        call genRookMovesW(gameBoard, fileQ, rankQ, legalMoves, numMoves)
-        call genBishopMovesW(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+        maxMoves = size(legalMoves)
+        if (gameBoard(rankQ, fileQ) /= 'Q') return
+
+        fromFile = achar(iachar('a') + fileQ - 1)
+        fromRank = achar(iachar('0') + rankQ)
+
+    
+        do i = 1, 4
+            nr = rankQ
+            nf = fileQ
+            do
+                nr = nr + ddr(i)
+                nf = nf + ddf(i)
+                if (nr < 1 .or. nr > 8 .or. nf < 1 .or. nf > 8) exit
+                
+                if (gameBoard(nr, nf) >= 'A' .and. gameBoard(nr, nf) <= 'Z') exit
+                if (numMoves < maxMoves) then
+                    numMoves = numMoves + 1
+                    toFile = achar(iachar('a') + nf - 1)
+                    toRank = achar(iachar('0') + nr)
+                    legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                end if
+               
+                if (gameBoard(nr, nf) >= 'a' .and. gameBoard(nr, nf) <= 'z') exit
+            end do
+        end do
+
+      
+        do i = 1, 4
+            nr = rankQ
+            nf = fileQ
+            do
+                nr = nr + rdr(i)
+                nf = nf + rdf(i)
+                if (nr < 1 .or. nr > 8 .or. nf < 1 .or. nf > 8) exit
+                
+                if (gameBoard(nr, nf) >= 'A' .and. gameBoard(nr, nf) <= 'Z') exit
+                if (numMoves < maxMoves) then
+                    numMoves = numMoves + 1
+                    toFile = achar(iachar('a') + nf - 1)
+                    toRank = achar(iachar('0') + nr)
+                    legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                end if
+                
+                if (gameBoard(nr, nf) >= 'a' .and. gameBoard(nr, nf) <= 'z') exit
+            end do
+        end do
     end subroutine genQueenMovesW
+
 
     subroutine genQueenMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
         implicit none
@@ -819,8 +1069,61 @@ end subroutine lookIntoFuture
         integer, intent(in) :: fileQ, rankQ
         character(len=5), intent(inout) :: legalMoves(:)
         integer, intent(inout) :: numMoves
-        call genRookMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
-        call genBishopMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+        integer :: maxMoves
+        integer :: i, nr, nf
+        integer, dimension(4) :: ddr = (/  1,  1, -1, -1 /)
+        integer, dimension(4) :: ddf = (/  1, -1, -1,  1 /)
+        integer, dimension(4) :: rdr = (/  1, -1,  0,  0 /)
+        integer, dimension(4) :: rdf = (/  0,  0,  1, -1 /)
+        character :: fromFile, fromRank, toFile, toRank
+
+        maxMoves = size(legalMoves)
+        if (gameBoard(rankQ, fileQ) /= 'q') return
+
+        fromFile = achar(iachar('a') + fileQ - 1)
+        fromRank = achar(iachar('0') + rankQ)
+
+        
+        do i = 1, 4
+            nr = rankQ
+            nf = fileQ
+            do
+                nr = nr + ddr(i)
+                nf = nf + ddf(i)
+                if (nr < 1 .or. nr > 8 .or. nf < 1 .or. nf > 8) exit
+                
+                if (gameBoard(nr, nf) >= 'a' .and. gameBoard(nr, nf) <= 'z') exit
+                if (numMoves < maxMoves) then
+                    numMoves = numMoves + 1
+                    toFile = achar(iachar('a') + nf - 1)
+                    toRank = achar(iachar('0') + nr)
+                    legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                end if
+                
+                if (gameBoard(nr, nf) >= 'A' .and. gameBoard(nr, nf) <= 'Z') exit
+            end do
+        end do
+
+        
+        do i = 1, 4
+            nr = rankQ
+            nf = fileQ
+            do
+                nr = nr + rdr(i)
+                nf = nf + rdf(i)
+                if (nr < 1 .or. nr > 8 .or. nf < 1 .or. nf > 8) exit
+                
+                if (gameBoard(nr, nf) >= 'a' .and. gameBoard(nr, nf) <= 'z') exit
+                if (numMoves < maxMoves) then
+                    numMoves = numMoves + 1
+                    toFile = achar(iachar('a') + nf - 1)
+                    toRank = achar(iachar('0') + nr)
+                    legalMoves(numMoves) = fromFile // fromRank // toFile // toRank
+                end if
+                
+                if (gameBoard(nr, nf) >= 'A' .and. gameBoard(nr, nf) <= 'Z') exit
+            end do
+        end do
     end subroutine genQueenMovesB
 
 

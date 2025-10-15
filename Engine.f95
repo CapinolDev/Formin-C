@@ -1,7 +1,7 @@
 program Engine
     implicit none
 
-    character(len=1) :: board(8,8)
+    character(len=1) :: board(8,8) 
     integer :: rank, file
     character(len=5) :: legalMoves(218)
     integer :: nMoves, showChoices, ios, showValidator, moveInputValidator
@@ -11,6 +11,12 @@ program Engine
     character(len=5) :: userMove, engineMove
     integer :: cf, cr, gf, gr
     logical :: valid, game
+    character (len=5) :: osClear
+    character (len=1024) :: osSeperator
+
+
+
+    
 
     playingPlayer = 'White'
     game = .true.
@@ -21,9 +27,16 @@ program Engine
     showChoices = 0
     playerSelectValidator = 0
 
+    call get_environment_variable("PATH", osSeperator)
+    if (index(osSeperator, ";") > 0) then
+        osClear = 'cls'
+    else
+        osClear = 'clear'
+    end if
+
     do while (playerSelectValidator ==  0)
         
-        call system('clear')   
+        call system(osClear)   
 
         print*,'Which color do you want to be?'
         print*,'1. White'
@@ -54,7 +67,7 @@ program Engine
     end do
     call initBoard(board)
     do while (game)
-        call system('clear')
+        call system(osClear)
         posEval = 0
         moveInputValidator = 0
         print*, 'You are ',selectedPlayer

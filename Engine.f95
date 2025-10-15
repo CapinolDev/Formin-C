@@ -6,13 +6,13 @@ program Engine
     character(len=5) :: legalMoves(218)
     integer :: nMoves, showChoices, ios, showValidator, moveInputValidator
     integer :: playerSelectValidator
-    character(len=5) :: selectedPlayer
+    character(len=5) :: selectedPlayer, playingPlayer
     real :: randHelper, posEval
-    character(len=5) :: userMove
+    character(len=5) :: userMove, engineMove
     integer :: cf, cr, gf, gr
     logical :: valid, game
 
-
+    playingPlayer = 'White'
     game = .true.
     moveInputValidator = 0
     showValidator = 0
@@ -22,6 +22,7 @@ program Engine
     playerSelectValidator = 0
 
     do while (playerSelectValidator ==  0)
+        
         call system('clear')   
 
         print*,'Which color do you want to be?'
@@ -54,6 +55,7 @@ program Engine
     call initBoard(board)
     do while (game)
         call system('clear')
+        posEval = 0
         moveInputValidator = 0
         print*, 'You are ',selectedPlayer
 
@@ -77,51 +79,71 @@ program Engine
 
         do file = 1,8
             do rank = 1,8
-                
-                call genPawnMovesW(board, file, rank, legalMoves, nMoves)
-                call genKingMovesW(board, file, rank, legalMoves, nMoves)
-                call genKnightMovesW(board, file, rank, legalMoves, nMoves)                    
-                call genRookMovesW(board, file, rank, legalMoves, nMoves)
-                call genBishopMovesW(board, file, rank, legalMoves, nMoves)
-                call genQueenMovesW(board, file, rank, legalMoves, nMoves)          
-                
-                call genPawnMovesB(board, file, rank, legalMoves, nMoves)
-                call genKingMovesB(board, file, rank, legalMoves, nMoves)
-                call genKnightMovesB(board, file, rank, legalMoves, nMoves)
-                call genRookMovesB(board, file, rank, legalMoves, nMoves)
-                call genBishopMovesB(board, file, rank, legalMoves, nMoves)                    
-                call genQueenMovesB(board, file, rank, legalMoves, nMoves)
-                              
+                select case (playingPlayer)
+                    case ('White')
+                        call genPawnMovesW(board, file, rank, legalMoves, nMoves)
+                        call genKingMovesW(board, file, rank, legalMoves, nMoves)
+                        call genKnightMovesW(board, file, rank, legalMoves, nMoves)
+                        call genRookMovesW(board, file, rank, legalMoves, nMoves)
+                        call genBishopMovesW(board, file, rank, legalMoves, nMoves)
+                        call genQueenMovesW(board, file, rank, legalMoves, nMoves)
+                    case ('Black')
+                        call genPawnMovesB(board, file, rank, legalMoves, nMoves)
+                        call genKingMovesB(board, file, rank, legalMoves, nMoves)
+                        call genKnightMovesB(board, file, rank, legalMoves, nMoves)
+                        call genRookMovesB(board, file, rank, legalMoves, nMoves)
+                        call genBishopMovesB(board, file, rank, legalMoves, nMoves)
+                        call genQueenMovesB(board, file, rank, legalMoves, nMoves)
+                end select              
             end do
 
         end do
 
         call evalPos(board, posEval)
         print*, posEval
+        if (selectedPlayer == playingPlayer) then
+            do while (moveInputValidator == 0)
 
-        do while (moveInputValidator == 0)
+                print*, 'Enter your move (e.g., e2e4):'
+                read(*,'(A)') userMove
 
-            print*, 'Enter your move (e.g., e2e4):'
-            read(*,'(A)') userMove
+                call parseMoveAndValidate(trim(userMove), legalMoves, nMoves, cf, cr, gf, gr, valid)
 
-            call parseMoveAndValidate(trim(userMove), legalMoves, nMoves, cf, cr, gf, gr, valid)
+                if (valid) then
+                    
+        
+                    call makeMove(board, cf, cr, gf, gr, board(cr, cf))
+                    moveInputValidator = 1
+                    if (playingPlayer == 'White') then
+                        playingPlayer = 'Black'
+                    else
+                        playingPlayer = 'White'
+                    end if
+                else
+                    print*, 'Invalid or illegal move! Try again.'
+                end if
+            end do
 
+        else 
+            call pickRandomMove(legalMoves, nMoves,engineMove)        
+            call parseMoveAndValidate(trim(engineMove), legalMoves, nMoves, cf, cr, gf, gr, valid)
             if (valid) then
-                print*, 'Move accepted:', trim(userMove)
-       
                 call makeMove(board, cf, cr, gf, gr, board(cr, cf))
-                moveInputValidator = 1
             else
-                print*, 'Invalid or illegal move! Try again.'
+                print *, 'Engine move failed (this should not happen)'
             end if
-        end do
+            
+            if (playingPlayer == 'White') then
+                playingPlayer = 'Black'
+            else
+                playingPlayer = 'White'
+            end if
+        end if
+        
     end do
-
-    
-
-
-
-    
+        
+        
+   
 
 contains
 
@@ -144,7 +166,7 @@ contains
         board(8,:) = ['r','n','b','q','k','b','n','r']
         board(7,:) = ['p','p','p','p','p','p','p','p']
 
-    end subroutine initBoard
+    end subroutine initBoard    
 
     subroutine makeMove(board, currentFile, currentRank, goalFile, goalRank, piece)
         character(len=1), intent(inout) :: board(8,8)
@@ -157,6 +179,27 @@ contains
                
            
     end subroutine makeMove
+
+    subroutine pickRandomMove(legalMoves, nMoves, randomMove)
+        implicit none
+        character(len=5), intent(in) :: legalMoves(:)
+        integer, intent(in) :: nMoves
+        character(len=5), intent(out) :: randomMove
+        real :: r
+        integer :: index
+
+        if (nMoves <= 0) then
+            randomMove = ''
+            return
+        end if
+
+        call random_number(r)
+        index = int(r * nMoves) + 1
+        if (index > nMoves) index = nMoves
+
+        randomMove = legalMoves(index)
+    end subroutine pickRandomMove
+
 
     subroutine parseMoveAndValidate(move, legalMoves, nMoves, currentFile, currentRank, goalFile, goalRank, isValid)
         implicit none
@@ -240,6 +283,7 @@ contains
         end do
     end  subroutine evalPos
 
+    
 
     subroutine genPawnMovesW(gameBoard, fileP, rankP, legalMoves, numMoves)
         implicit none
@@ -251,8 +295,6 @@ contains
         character :: fileChar, rankChar, nextRankChar
 
         maxMoves = size(legalMoves)
-
-        
 
         if (gameBoard(rankP, fileP) /= 'P') return
         

@@ -13,8 +13,10 @@ program Engine
     logical :: valid, game
     character (len=5) :: osClear
     character (len=1024) :: osSeperator
-
-
+    logical :: whiteCanCastleKingside, whiteCanCastleQueenside
+    logical :: blackCanCastleKingside, blackCanCastleQueenside
+    character(len=1) :: promo
+    character(len=1) :: pieceToMove
 
     
     playingPlayer = 'White'
@@ -25,6 +27,11 @@ program Engine
     board = ' '
     showChoices = 0
     playerSelectValidator = 0
+    whiteCanCastleKingside = .true.
+    whiteCanCastleQueenside = .true.
+    blackCanCastleKingside = .true.
+    blackCanCastleQueenside = .true.
+
 
     call get_environment_variable("PATH", osSeperator)
     if (index(osSeperator, ";") > 0) then
@@ -130,12 +137,15 @@ program Engine
                 print*, 'Enter your move (e.g., e2e4):'
                 read(*,'(A)') userMove
 
-                call parseMoveAndValidate(trim(userMove), legalMoves, nMoves, cf, cr, gf, gr, valid)
+                call parseMoveAndValidate(trim(userMove), legalMoves, nMoves, cf, cr, gf, gr, valid, promo)
 
-                if (valid) then
-                    
-        
-                    call makeMove(board, cf, cr, gf, gr, board(cr, cf))
+                if (valid) then 
+                    pieceToMove = board(cr, cf)
+                    if (promo /= ' ') then
+                        call makeMove(board, cf, cr, gf, gr, pieceToMove, promo)
+                    else
+                        call makeMove(board, cf, cr, gf, gr, pieceToMove)
+                    end if
                     moveInputValidator = 1
                     if (playingPlayer == 'White') then
                         playingPlayer = 'Black'
@@ -153,15 +163,22 @@ program Engine
                 print*, 'Move ', i, ': ', trim(legalMoves(i))
             end do
 
-            call lookIntoFuture(board, legalMoves, nMoves, engineMove, engineColor, 4)
-           
-            call parseMoveAndValidate(trim(engineMove), legalMoves, nMoves, cf, cr, gf, gr, valid)
+            call lookIntoFuture(board, legalMoves, nMoves, engineMove, engineColor, 3)
+            
+
+            call parseMoveAndValidate(trim(engineMove), legalMoves, nMoves, cf, cr, gf, gr, valid, promo)
 
             if (valid) then
-                call makeMove(board, cf, cr, gf, gr, board(cr, cf))
+                pieceToMove = board(cr, cf)  
+                if (promo /= ' ') then
+                    call makeMove(board, cf, cr, gf, gr, pieceToMove, promo)
+                else
+                    call makeMove(board, cf, cr, gf, gr, pieceToMove)
+                end if
             else
                 print*, 'Engine attempted invalid move! This should not happen.'
             end if
+
             if (playingPlayer == 'White') then
                 playingPlayer = 'Black'
             else
@@ -183,7 +200,7 @@ program Engine
         print*, 'Game over.'
     end if
         
-   
+
 
 contains
 
@@ -207,18 +224,117 @@ contains
         board(7,:) = ['p','p','p','p','p','p','p','p']
 
     end subroutine initBoard    
-
-    subroutine makeMove(board, currentFile, currentRank, goalFile, goalRank, piece)
+    subroutine makeMove(board, currentFile, currentRank, goalFile, goalRank, piece, promotionPiece)
+        implicit none
         character(len=1), intent(inout) :: board(8,8)
         integer, intent(in) :: currentFile, currentRank, goalFile, goalRank
-        character(len=1), intent(inout) :: piece
+        character(len=1), intent(in) :: piece
+        character(len=1), intent(in), optional :: promotionPiece
 
-        board(goalRank, goalFile) = piece
+        call updateCastleRightsForMove(board, currentFile, currentRank, goalFile, goalRank, &
+            piece, whiteCanCastleKingside, whiteCanCastleQueenside, &
+            blackCanCastleKingside, blackCanCastleQueenside)
+
+        if (piece == 'K' .and. currentRank == 1 .and. currentFile == 5) then
+            if (goalFile == 7 .and. goalRank == 1) then
+                board(1,5) = ' '; board(1,7) = 'K'
+                board(1,8) = ' '; board(1,6) = 'R'
+                return
+            else if (goalFile == 3 .and. goalRank == 1) then
+                board(1,5) = ' '; board(1,3) = 'K'
+                board(1,1) = ' '; board(1,4) = 'R'
+                return
+            end if
+        end if
+        if (piece == 'k' .and. currentRank == 8 .and. currentFile == 5) then
+            if (goalFile == 7 .and. goalRank == 8) then
+                board(8,5) = ' '; board(8,7) = 'k'
+                board(8,8) = ' '; board(8,6) = 'r'
+                return
+            else if (goalFile == 3 .and. goalRank == 8) then
+                board(8,5) = ' '; board(8,3) = 'k'
+                board(8,1) = ' '; board(8,4) = 'r'
+                return
+            end if
+        end if
+
+
+        if (present(promotionPiece)) then
+            board(goalRank, goalFile) = promotionPiece
+        else
+            board(goalRank, goalFile) = piece
+        end if
         board(currentRank, currentFile) = ' '
-        
-               
-           
     end subroutine makeMove
+
+    subroutine makeMoveSim(board, currentFile, currentRank, goalFile, goalRank, piece, promotionPiece)
+        implicit none
+        character(len=1), intent(inout) :: board(8,8)
+        integer, intent(in) :: currentFile, currentRank, goalFile, goalRank
+        character(len=1), intent(in) :: piece
+        character(len=1), intent(in), optional :: promotionPiece
+
+        if (piece == 'K' .and. currentRank == 1 .and. currentFile == 5) then
+            if (goalFile == 7 .and. goalRank == 1) then
+                board(1,5) = ' '; board(1,7) = 'K'
+                board(1,8) = ' '; board(1,6) = 'R'
+                return
+            else if (goalFile == 3 .and. goalRank == 1) then
+                board(1,5) = ' '; board(1,3) = 'K'
+                board(1,1) = ' '; board(1,4) = 'R'
+                return
+            end if
+        end if
+        if (piece == 'k' .and. currentRank == 8 .and. currentFile == 5) then
+            if (goalFile == 7 .and. goalRank == 8) then
+                board(8,5) = ' '; board(8,7) = 'k'
+                board(8,8) = ' '; board(8,6) = 'r'
+                return
+            else if (goalFile == 3 .and. goalRank == 8) then
+                board(8,5) = ' '; board(8,3) = 'k'
+                board(8,1) = ' '; board(8,4) = 'r'
+                return
+            end if
+        end if
+
+        if (present(promotionPiece)) then
+            board(goalRank, goalFile) = promotionPiece
+        else
+            board(goalRank, goalFile) = piece
+        end if
+        board(currentRank, currentFile) = ' '
+    end subroutine makeMoveSim
+
+    subroutine updateCastleRightsForMove(board, cf, cr, gf, gr, piece, &
+         wK, wQ, bK, bQ)
+        implicit none
+        character(len=1), intent(in) :: board(8,8)
+        integer, intent(in) :: cf, cr, gf, gr
+        character(len=1), intent(in) :: piece
+        logical, intent(inout) :: wK, wQ, bK, bQ
+
+        if (piece == 'K') then
+            wK = .false.; wQ = .false.
+        else if (piece == 'k') then
+            bK = .false.; bQ = .false.
+        end if
+
+        if (piece == 'R') then
+            if (cf == 1 .and. cr == 1) wQ = .false.
+            if (cf == 8 .and. cr == 1) wK = .false.
+        else if (piece == 'r') then
+            if (cf == 1 .and. cr == 8) bQ = .false.
+            if (cf == 8 .and. cr == 8) bK = .false.
+        end if
+
+        if (board(gr, gf) == 'R') then
+            if (gf == 1 .and. gr == 1) wQ = .false.
+            if (gf == 8 .and. gr == 1) wK = .false.
+        else if (board(gr, gf) == 'r') then
+            if (gf == 1 .and. gr == 8) bQ = .false.
+            if (gf == 8 .and. gr == 8) bK = .false.
+        end if
+    end subroutine updateCastleRightsForMove
 
     subroutine pickRandomMove(legalMoves, nMoves, randomMove)
         implicit none
@@ -240,14 +356,14 @@ contains
         randomMove = legalMoves(index)
     end subroutine pickRandomMove
 
-
-    subroutine parseMoveAndValidate(move, legalMoves, nMoves, currentFile, currentRank, goalFile, goalRank, isValid)
+    subroutine parseMoveAndValidate(move, legalMoves, nMoves, currentFile, currentRank, goalFile, goalRank, isValid, promotionPiece)
         implicit none
         character(len=*), intent(in) :: move
         character(len=5), intent(in) :: legalMoves(:)
         integer, intent(in) :: nMoves
         integer, intent(out) :: currentFile, currentRank, goalFile, goalRank
         logical, intent(out) :: isValid
+        character(len=1), intent(out), optional :: promotionPiece
 
         character :: c1, c2, c3, c4
         integer :: i
@@ -257,6 +373,7 @@ contains
         currentRank = 0
         goalFile = 0
         goalRank = 0
+        if (present(promotionPiece)) promotionPiece = ' '
 
         if (len_trim(move) < 4) return
 
@@ -272,9 +389,12 @@ contains
 
         currentFile = iachar(c1) - iachar('a') + 1
         goalFile    = iachar(c3) - iachar('a') + 1
-
         read(c2, '(I1)') currentRank
         read(c4, '(I1)') goalRank
+
+        if (len_trim(move) == 5 .and. present(promotionPiece)) then
+            promotionPiece = move(5:5)
+        end if
 
         do i = 1, nMoves
             if (trim(legalMoves(i)) == trim(move)) then
@@ -445,11 +565,15 @@ contains
         outIdx = 0
 
         do i = 1, oldN
-            call parseMoveAndValidate(trim(tempIn(i)), tempIn, oldN, cf, cr, gf, gr, valid)
+            call parseMoveAndValidate(trim(tempIn(i)), tempIn, oldN, cf, cr, gf, gr, valid, promo)
             if (.not. valid) cycle
 
             tempBoard = gameBoard
-            call makeMove(tempBoard, cf, cr, gf, gr, tempBoard(cr, cf))  
+            if (promo /= ' ') then
+                call makeMoveSim(tempBoard, cf, cr, gf, gr, tempBoard(cr, cf), promo)
+            else
+                call makeMoveSim(tempBoard, cf, cr, gf, gr, tempBoard(cr, cf))
+            end if
             call isInCheck(tempBoard, sideColor, stillInCheck)
             if (.not. stillInCheck) then
                 outIdx = outIdx + 1
@@ -486,7 +610,7 @@ contains
         do f = 1,8
             do r = 1,8
                
-                select case (board(f,r))
+                select case (board(r,f))
                     case ('P')
                         posEval = posEval + 1
                     case ('R')
@@ -514,9 +638,8 @@ contains
                
 
             end do
-        end do
-       
-    end  subroutine evalPos
+        end do 
+    end subroutine evalPos
     recursive function negamax(gameBoard, sideColor, legalMoves, nMoves, depth, outBestMove) result(score)
         implicit none
         character(len=1), intent(in) :: gameBoard(8,8)
@@ -539,6 +662,9 @@ contains
         character(len=5) :: candidateMove
         character(len=5) :: oppositeColor
         character(len=5) :: dummyMove
+
+        logical :: wK_old, wQ_old, bK_old, bQ_old
+        logical :: wK_new, wQ_new, bK_new, bQ_new
 
         outBestMove = ''
         score = 0.0
@@ -569,17 +695,40 @@ contains
         do i = 1, nMoves
             candidateMove = trim(legalMoves(i))
             if (candidateMove == '') cycle
-
-            call parseMoveAndValidate(candidateMove, legalMoves, nMoves, cf, cr, gf, gr, valid)
+            call parseMoveAndValidate(candidateMove, legalMoves, nMoves, cf, cr, gf, gr, valid, promo)
             if (.not. valid) cycle
 
             tmpBoard = gameBoard
             pieceToMove = tmpBoard(cr, cf)
-            call makeMove(tmpBoard, cf, cr, gf, gr, pieceToMove)
+            if (promo /= ' ') then
+                call makeMoveSim(tmpBoard, cf, cr, gf, gr, pieceToMove, promo)
+            else
+                call makeMoveSim(tmpBoard, cf, cr, gf, gr, pieceToMove)
+            end if
+
+            wK_old = whiteCanCastleKingside
+            wQ_old = whiteCanCastleQueenside
+            bK_old = blackCanCastleKingside
+            bQ_old = blackCanCastleQueenside
+
+            wK_new = wK_old; wQ_new = wQ_old
+            bK_new = bK_old; bQ_new = bQ_old
+            call updateCastleRightsForMove(gameBoard, cf, cr, gf, gr, pieceToMove, &
+                wK_new, wQ_new, bK_new, bQ_new)
+
+            whiteCanCastleKingside = wK_new
+            whiteCanCastleQueenside = wQ_new
+            blackCanCastleKingside = bK_new
+            blackCanCastleQueenside = bQ_new
 
             childMoves = ''
             childN = 0
             call genAllMoves(tmpBoard, oppositeColor, childMoves, childN)
+
+            whiteCanCastleKingside = wK_old
+            whiteCanCastleQueenside = wQ_old
+            blackCanCastleKingside = bK_old
+            blackCanCastleQueenside = bQ_old
 
             curScore = -negamax(tmpBoard, oppositeColor, childMoves, childN, depth-1, dummyMove)
 
@@ -655,72 +804,171 @@ contains
     end subroutine genAllMoves
 
 
+    subroutine genCastlingMoves(board, sideColor, canCastleK, canCastleQ, legalMoves, nMoves)
+        implicit none
+        character(len=1), intent(in) :: board(8,8)
+        character(len=*), intent(in) :: sideColor
+        logical, intent(in) :: canCastleK, canCastleQ
+        character(len=5), intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: nMoves
+
+        logical :: attacked
+        integer :: maxMoves
+
+        maxMoves = size(legalMoves)
+
+        if (trim(sideColor) == "White") then
+            if (canCastleK .and. board(1,8) == 'R') then
+                if (board(1,6) == ' ' .and. board(1,7) == ' ') then
+                    call isSquareAttacked(board, 1, 5, "Black", attacked)
+                    if (.not. attacked) then
+                        call isSquareAttacked(board, 1, 6, "Black", attacked)
+                        if (.not. attacked) then
+                            call isSquareAttacked(board, 1, 7, "Black", attacked)
+                            if (.not. attacked) then
+                                if (nMoves < maxMoves) then
+                                    nMoves = nMoves + 1
+                                    legalMoves(nMoves) = "e1g1"
+                                end if
+                            end if
+                        end if
+                    end if
+                end if
+            end if
+
+            if (canCastleQ .and. board(1,1) == 'R') then
+                if (board(1,2) == ' ' .and. board(1,3) == ' ' .and. board(1,4) == ' ') then
+                    call isSquareAttacked(board, 1, 5, "Black", attacked)
+                    if (.not. attacked) then
+                        call isSquareAttacked(board, 1, 4, "Black", attacked) 
+                        if (.not. attacked) then
+                            call isSquareAttacked(board, 1, 3, "Black", attacked) 
+                            if (.not. attacked) then
+                                if (nMoves < maxMoves) then
+                                    nMoves = nMoves + 1
+                                    legalMoves(nMoves) = "e1c1"
+                                end if
+                            end if
+                        end if
+                    end if
+                end if
+            end if
+
+        else
+            if (canCastleK .and. board(8,8) == 'r') then
+                if (board(8,6) == ' ' .and. board(8,7) == ' ') then
+                    call isSquareAttacked(board, 8, 5, "White", attacked)
+                    if (.not. attacked) then
+                        call isSquareAttacked(board, 8, 6, "White", attacked) 
+                        if (.not. attacked) then
+                            call isSquareAttacked(board, 8, 7, "White", attacked)
+                            if (.not. attacked) then
+                                if (nMoves < maxMoves) then
+                                    nMoves = nMoves + 1
+                                    legalMoves(nMoves) = "e8g8"
+                                end if
+                            end if
+                        end if
+                    end if
+                end if
+            end if
+
+            if (canCastleQ .and. board(8,1) == 'r') then
+                if (board(8,2) == ' ' .and. board(8,3) == ' ' .and. board(8,4) == ' ') then
+                    call isSquareAttacked(board, 8, 5, "White", attacked)
+                    if (.not. attacked) then
+                        call isSquareAttacked(board, 8, 4, "White", attacked) 
+                        if (.not. attacked) then
+                            call isSquareAttacked(board, 8, 3, "White", attacked) 
+                            if (.not. attacked) then
+                                if (nMoves < maxMoves) then
+                                    nMoves = nMoves + 1
+                                    legalMoves(nMoves) = "e8c8"
+                                end if
+                            end if
+                        end if
+                    end if
+                end if
+            end if
+        end if
+    end subroutine genCastlingMoves
+
     subroutine genPawnMovesW(gameBoard, fileP, rankP, legalMoves, numMoves)
         implicit none
         character(len=1), intent(in) :: gameBoard(8,8)
         integer, intent(in) :: fileP, rankP
         character(len=5), intent(inout) :: legalMoves(:)
         integer, intent(inout) :: numMoves
-        integer :: nextRank, maxMoves
+        integer :: nextRank, maxMoves, pi
         character :: fileChar, rankChar, nextRankChar
+        character(len=1), dimension(4) :: promos
 
+        promos = (/'Q','R','B','N'/)
         maxMoves = size(legalMoves)
 
         if (gameBoard(rankP, fileP) /= 'P') return
         
         nextRank = rankP + 1
-        
-        if (nextRank <= 8) then
+        fileChar     = achar(iachar('a') + fileP - 1)
+        rankChar     = achar(iachar('0') + rankP)
+        nextRankChar = achar(iachar('0') + nextRank)
 
-            if (fileP > 1) then
-                if (gameBoard(nextRank, fileP-1) >= 'a' .and. gameBoard(nextRank, fileP-1) <= 'z') then
+        if (nextRank == 8) then
+       
+            if (fileP > 1 .and. gameBoard(nextRank, fileP-1) >= 'a' .and. gameBoard(nextRank, fileP-1) <= 'z') then
+                do pi = 1, 4
                     if (numMoves < maxMoves) then
                         numMoves = numMoves + 1
-                        fileChar = achar(iachar('a') + fileP - 1)
-                        rankChar = achar(iachar('0') + rankP)
-                        nextRankChar = achar(iachar('0') + nextRank)
-                        legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a') + fileP - 2) // nextRankChar
+                        legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a')+fileP-2) // nextRankChar // promos(pi)
                     end if
+                end do
+            end if
+            if (fileP < 8 .and. gameBoard(nextRank, fileP+1) >= 'a' .and. gameBoard(nextRank, fileP+1) <= 'z') then
+                do pi = 1, 4
+                    if (numMoves < maxMoves) then
+                        numMoves = numMoves + 1
+                        legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a')+fileP) // nextRankChar // promos(pi)
+                    end if
+                end do
+            end if
+        
+            if (gameBoard(nextRank, fileP) == ' ') then
+                do pi = 1, 4
+                    if (numMoves < maxMoves) then
+                        numMoves = numMoves + 1
+                        legalMoves(numMoves) = fileChar // rankChar // fileChar // nextRankChar // promos(pi)
+                    end if
+                end do
+            end if
+        else
+
+            if (fileP > 1 .and. gameBoard(nextRank, fileP-1) >= 'a' .and. gameBoard(nextRank, fileP-1) <= 'z') then
+                if (numMoves < maxMoves) then
+                    numMoves = numMoves + 1
+                    legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a')+fileP-2) // nextRankChar
+                end if
+            end if
+            if (fileP < 8 .and. gameBoard(nextRank, fileP+1) >= 'a' .and. gameBoard(nextRank, fileP+1) <= 'z') then
+                if (numMoves < maxMoves) then
+                    numMoves = numMoves + 1
+                    legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a')+fileP) // nextRankChar
                 end if
             end if
             
-            if (fileP < 8) then
-                if (gameBoard(nextRank, fileP+1) >= 'a' .and. gameBoard(nextRank, fileP+1) <= 'z') then
-                    if (numMoves < maxMoves) then
-                        numMoves = numMoves + 1
-                        fileChar = achar(iachar('a') + fileP - 1)
-                        rankChar = achar(iachar('0') + rankP)
-                        nextRankChar = achar(iachar('0') + nextRank)
-                        legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a') + fileP) // nextRankChar
-                    end if
-                end if
-            end if
-        end if
-
-        if (nextRank <= 8) then
             if (gameBoard(nextRank, fileP) == ' ') then
                 if (numMoves < maxMoves) then
                     numMoves = numMoves + 1
-                    fileChar = achar(iachar('a') + fileP - 1)
-                    rankChar = achar(iachar('0') + rankP)
-                    nextRankChar = achar(iachar('0') + nextRank)
                     legalMoves(numMoves) = fileChar // rankChar // fileChar // nextRankChar
                 end if
             end if
-        end if
-
-        if (rankP == 2) then
-            if (gameBoard(3, fileP) == ' ' .and. gameBoard(4, fileP) == ' ') then
+            
+            if (rankP == 2 .and. gameBoard(3,fileP) == ' ' .and. gameBoard(4,fileP) == ' ') then
                 if (numMoves < maxMoves) then
                     numMoves = numMoves + 1
-                    fileChar = achar(iachar('a') + fileP - 1)
-                    rankChar = achar(iachar('0') + rankP)
-                    nextRankChar = achar(iachar('0') + (rankP + 2))
-                    legalMoves(numMoves) = fileChar // rankChar // fileChar // nextRankChar
+                    legalMoves(numMoves) = fileChar // rankChar // fileChar // '4'
                 end if
             end if
         end if
-
     end subroutine genPawnMovesW
 
     subroutine genPawnMovesB(gameBoard, fileP, rankP, legalMoves, numMoves)
@@ -729,66 +977,77 @@ contains
         integer, intent(in) :: fileP, rankP
         character(len=5), intent(inout) :: legalMoves(:)
         integer, intent(inout) :: numMoves
-        integer :: nextRank
+        integer :: nextRank, maxMoves, pi
         character :: fileChar, rankChar, nextRankChar
-        integer :: maxMoves
+        character(len=1), dimension(4) :: promos
 
+        promos = (/'q','r','b','n'/)
         maxMoves = size(legalMoves)
 
         if (gameBoard(rankP, fileP) /= 'p') return
-
+        
         nextRank = rankP - 1
+        fileChar     = achar(iachar('a') + fileP - 1)
+        rankChar     = achar(iachar('0') + rankP)
+        nextRankChar = achar(iachar('0') + nextRank)
 
-        if (nextRank >= 1) then
-            if (fileP > 1) then
-                if (gameBoard(nextRank, fileP-1) >= 'A' .and. gameBoard(nextRank, fileP-1) <= 'Z') then
+        if (nextRank == 1) then
+            
+            if (fileP > 1 .and. gameBoard(nextRank, fileP-1) >= 'A' .and. gameBoard(nextRank, fileP-1) <= 'Z') then
+                do pi = 1, 4
                     if (numMoves < maxMoves) then
                         numMoves = numMoves + 1
-                        fileChar = achar(iachar('a') + fileP - 1)
-                        rankChar = achar(iachar('0') + rankP)
-                        nextRankChar = achar(iachar('0') + nextRank)
-                        legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a') + fileP - 2) // nextRankChar
+                        legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a')+fileP-2) // nextRankChar // promos(pi)
                     end if
+                end do
+            end if
+            if (fileP < 8 .and. gameBoard(nextRank, fileP+1) >= 'A' .and. gameBoard(nextRank, fileP+1) <= 'Z') then
+                do pi = 1, 4
+                    if (numMoves < maxMoves) then
+                        numMoves = numMoves + 1
+                        legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a')+fileP) // nextRankChar // promos(pi)
+                    end if
+                end do
+            end if
+            ! Forward
+            if (gameBoard(nextRank, fileP) == ' ') then
+                do pi = 1, 4
+                    if (numMoves < maxMoves) then
+                        numMoves = numMoves + 1
+                        legalMoves(numMoves) = fileChar // rankChar // fileChar // nextRankChar // promos(pi)
+                    end if
+                end do
+            end if
+        else
+            ! --- Normal pawn moves ---
+            ! Captures
+            if (fileP > 1 .and. gameBoard(nextRank, fileP-1) >= 'A' .and. gameBoard(nextRank, fileP-1) <= 'Z') then
+                if (numMoves < maxMoves) then
+                    numMoves = numMoves + 1
+                    legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a')+fileP-2) // nextRankChar
+                end if
+            end if
+            if (fileP < 8 .and. gameBoard(nextRank, fileP+1) >= 'A' .and. gameBoard(nextRank, fileP+1) <= 'Z') then
+                if (numMoves < maxMoves) then
+                    numMoves = numMoves + 1
+                    legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a')+fileP) // nextRankChar
                 end if
             end if
 
-            if (fileP < 8) then
-                if (gameBoard(nextRank, fileP+1) >= 'A' .and. gameBoard(nextRank, fileP+1) <= 'Z') then
-                    if (numMoves < maxMoves) then
-                        numMoves = numMoves + 1
-                        fileChar = achar(iachar('a') + fileP - 1)
-                        rankChar = achar(iachar('0') + rankP)
-                        nextRankChar = achar(iachar('0') + nextRank)
-                        legalMoves(numMoves) = fileChar // rankChar // achar(iachar('a') + fileP) // nextRankChar
-                    end if
-                end if
-            end if
-        end if
-
-        if (nextRank >= 1) then
             if (gameBoard(nextRank, fileP) == ' ') then
                 if (numMoves < maxMoves) then
                     numMoves = numMoves + 1
-                    fileChar = achar(iachar('a') + fileP - 1)
-                    rankChar = achar(iachar('0') + rankP)
-                    nextRankChar = achar(iachar('0') + nextRank)
                     legalMoves(numMoves) = fileChar // rankChar // fileChar // nextRankChar
                 end if
             end if
-        end if
 
-        if (rankP == 7) then
-            if (gameBoard(6, fileP) == ' ' .and. gameBoard(5, fileP) == ' ') then
+            if (rankP == 7 .and. gameBoard(6,fileP) == ' ' .and. gameBoard(5,fileP) == ' ') then
                 if (numMoves < maxMoves) then
                     numMoves = numMoves + 1
-                    fileChar = achar(iachar('a') + fileP - 1)
-                    rankChar = achar(iachar('0') + rankP)
-                    nextRankChar = achar(iachar('0') + (rankP - 2))
-                    legalMoves(numMoves) = fileChar // rankChar // fileChar // nextRankChar
+                    legalMoves(numMoves) = fileChar // rankChar // fileChar // '5'
                 end if
             end if
         end if
-
     end subroutine genPawnMovesB
 
     subroutine genKingMovesW(gameBoard, fileK, rankK, legalMoves, numMoves)
@@ -805,12 +1064,19 @@ contains
 
         if (gameBoard(rankK, fileK) /= 'K') return
 
+        if (gameBoard(rankK, fileK) == 'K' .and. rankK == 1 .and. fileK == 5) then
+                    call genCastlingMoves(gameBoard, "White", whiteCanCastleKingside, whiteCanCastleQueenside, legalMoves, numMoves)
+                end if
+
+
         do df = -1, 1
             do dr = -1, 1
                 if (df == 0 .and. dr == 0) cycle
 
                 newFile = fileK + df
                 newRank = rankK + dr
+
+                
 
                 if (newFile >= 1 .and. newFile <= 8 .and. newRank >= 1 .and. newRank <= 8) then
                     if (.not.(gameBoard(newRank, newFile) >= 'A' .and. gameBoard(newRank, newFile) <= 'Z')) then
@@ -841,11 +1107,15 @@ contains
         maxMoves = size(legalMoves)
 
         if (gameBoard(rankK, fileK) /= 'k') return
+        if (gameBoard(rankK, fileK) == 'k' .and. rankK == 8 .and. fileK == 5) then
+            call genCastlingMoves(gameBoard, "Black", blackCanCastleKingside, blackCanCastleQueenside, legalMoves, numMoves)
+        end if
 
         do df = -1, 1
             do dr = -1, 1
                 if (df == 0 .and. dr == 0) cycle
 
+           
                 newFile = fileK + df
                 newRank = rankK + dr
 

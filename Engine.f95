@@ -2,7 +2,7 @@ program Engine
     implicit none
 
     character(len=1) :: board(8,8) 
-    integer :: rank, file
+    integer :: rank, file, i
     character(len=5) :: legalMoves(218)
     integer :: nMoves, showChoices, ios, showValidator, moveInputValidator
     integer :: playerSelectValidator
@@ -148,8 +148,13 @@ program Engine
             end do
 
         else 
-            call lookIntoFuture(board, legalMoves, nMoves, engineMove, engineColor)
+            print*, 'Engine has ', nMoves, ' legal moves to choose from.'
+            do i = 1, nMoves
+                print*, 'Move ', i, ': ', trim(legalMoves(i))
+            end do
 
+            call lookIntoFuture(board, legalMoves, nMoves, engineMove, engineColor, 4)
+           
             call parseMoveAndValidate(trim(engineMove), legalMoves, nMoves, cf, cr, gf, gr, valid)
 
             if (valid) then
@@ -463,14 +468,24 @@ contains
         nMoves = outIdx
     end subroutine filterLegalMoves
 
-
     subroutine evalPos(board, posEval)
         character(len=1), intent(in) :: board(8,8)
         real, intent(inout) :: posEval
         integer :: f, r
-        
+
+        real, parameter :: knightValuesW(8,8) = reshape( &
+            [2.1, 2.3, 2.4, 2.4, 2.4, 2.4, 2.3, 2.1, &
+            2.3, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.3, &
+            2.4, 3.0, 3.2, 3.2, 3.2, 3.2, 3.0, 2.4, &
+            2.4, 3.0, 3.2, 4.0, 4.0, 3.2, 3.0, 2.4, &
+            2.4, 3.0, 3.2, 4.0, 4.0, 3.2, 3.0, 2.4, &
+            2.4, 3.0, 3.2, 3.2, 3.2, 3.2, 3.0, 2.4, &
+            2.3, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.3, &
+            2.1, 2.3, 2.4, 2.4, 2.4, 2.4, 2.3, 2.1], [8,8] )
+            
         do f = 1,8
             do r = 1,8
+               
                 select case (board(f,r))
                     case ('P')
                         posEval = posEval + 1
@@ -479,7 +494,7 @@ contains
                     case ('B')
                         posEval = posEval + 3
                     case ('N')
-                        posEval = posEval + 3
+                        posEval = posEval + knightValuesW(f,r)  
                     case ('Q')
                         posEval = posEval + 8
                     case ('p')
@@ -489,68 +504,155 @@ contains
                     case ('b')
                         posEval = posEval - 3
                     case ('n')
-                        posEval = posEval - 3
+                        posEval = posEval - knightValuesW(f,r) 
+                       
                     case ('q')
                         posEval = posEval - 8
 
 
                 end select
-                
+               
+
             end do
         end do
+       
     end  subroutine evalPos
+    recursive function negamax(gameBoard, sideColor, legalMoves, nMoves, depth, outBestMove) result(score)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        character(len=*), intent(in) :: sideColor
+        character(len=5), intent(in) :: legalMoves(:)
+        integer, intent(in) :: nMoves, depth
+        character(len=5), intent(out) :: outBestMove
+        real :: score
 
-    subroutine lookIntoFuture(gameBoard, legalMoves, nMoves, engineMove, engineColor)
-    implicit none
-    character(len=1), intent(inout) :: gameBoard(8,8)
-    character(len=5), intent(in) :: legalMoves(:)
-    integer, intent(in) :: nMoves
-    character(len=5), intent(inout) :: engineMove
-    character(len=5), intent(in) :: engineColor
+        real, parameter :: MATE_SCORE = 1.0e6
+        real, parameter :: STALEMATE_SCORE = 0.0
+        logical :: inCheck
+        character(len=1) :: tmpBoard(8,8)
+        character(len=5) :: childMoves(218)
+        integer :: childN
+        integer :: i, cf, cr, gf, gr
+        logical :: valid
+        character(len=1) :: pieceToMove
+        real :: bestScore, curScore
+        character(len=5) :: candidateMove
+        character(len=5) :: oppositeColor
+        character(len=5) :: dummyMove
 
-    character(len=5) :: candidateMove
-    character(len=1) :: tempBoard(8,8)
-    integer :: cf, cr, gf, gr, i
-    logical :: valid
-    real :: posEval, bestPosEval
-    character(len=1) :: pieceToMove
- 
-    tempBoard = gameBoard
+        outBestMove = ''
+        score = 0.0
 
-    if (engineColor == 'White') then
-        bestPosEval = -1.0e6
-    else
-        bestPosEval =  1.0e6 
-    end if
-
-    engineMove = ''
-
-    do i = 1, nMoves
-        candidateMove = legalMoves(i)
-        call parseMoveAndValidate(trim(candidateMove), legalMoves, nMoves, cf, cr, gf, gr, valid)
-        if (.not. valid) cycle
-
-        pieceToMove = gameBoard(cr, cf)
-
-        tempBoard = gameBoard
-        call makeMove(tempBoard, cf, cr, gf, gr, pieceToMove)
-
-        posEval = 0.0
-        call evalPos(tempBoard, posEval)
-
-        if (engineColor == 'White') then
-            if (posEval > bestPosEval) then
-                bestPosEval = posEval
-                engineMove = candidateMove
-            end if
+        if (trim(sideColor) == 'White') then
+            oppositeColor = 'Black'
         else
-            if (posEval < bestPosEval) then
-                bestPosEval = posEval
-                engineMove = candidateMove
-            end if
+            oppositeColor = 'White'
         end if
-    end do
-end subroutine lookIntoFuture
+
+        call isInCheck(gameBoard, sideColor, inCheck)
+        if (nMoves == 0) then
+            if (inCheck) then
+                score = -MATE_SCORE + depth
+            else
+                score = STALEMATE_SCORE
+            end if
+            return
+        end if
+
+        if (depth <= 0) then
+            call evalPos(gameBoard, score)
+            return
+        end if
+
+        bestScore = -1.0e30
+
+        do i = 1, nMoves
+            candidateMove = trim(legalMoves(i))
+            if (candidateMove == '') cycle
+
+            call parseMoveAndValidate(candidateMove, legalMoves, nMoves, cf, cr, gf, gr, valid)
+            if (.not. valid) cycle
+
+            tmpBoard = gameBoard
+            pieceToMove = tmpBoard(cr, cf)
+            call makeMove(tmpBoard, cf, cr, gf, gr, pieceToMove)
+
+            childMoves = ''
+            childN = 0
+            call genAllMoves(tmpBoard, oppositeColor, childMoves, childN)
+
+            curScore = -negamax(tmpBoard, oppositeColor, childMoves, childN, depth-1, dummyMove)
+
+            if (curScore > bestScore) then
+                bestScore = curScore
+                outBestMove = candidateMove
+            end if
+        end do
+
+        score = bestScore
+    end function negamax
+
+    recursive subroutine lookIntoFuture(gameBoard, legalMoves, nMoves, engineMove, engineColor, depth)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        character(len=5), intent(in) :: legalMoves(:)
+        integer, intent(in) :: nMoves
+        character(len=5), intent(inout) :: engineMove
+        character(len=5), intent(in) :: engineColor
+        integer, intent(in) :: depth
+
+        real :: score
+        character(len=5) :: bestMoveLocal
+
+        engineMove = ''
+        bestMoveLocal = ''
+        score = 0.0
+
+        if (nMoves <= 0) then
+            return
+        end if
+
+        score = negamax(gameBoard, trim(engineColor), legalMoves, nMoves, depth, bestMoveLocal)
+
+        engineMove = bestMoveLocal
+    end subroutine lookIntoFuture
+
+    subroutine genAllMoves(gameBoard, sideColor, outMoves, outN)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        character(len=*), intent(in) :: sideColor
+        character(len=5), intent(out) :: outMoves(:)
+        integer, intent(out) :: outN
+
+        integer :: file, rank
+        integer :: maxMoves
+
+        maxMoves = size(outMoves)
+        outN = 0
+        outMoves = ''   
+
+        do file = 1,8
+            do rank = 1,8
+                if (trim(sideColor) == 'White') then
+                    call genPawnMovesW(gameBoard, file, rank, outMoves, outN)
+                    call genKingMovesW(gameBoard, file, rank, outMoves, outN)
+                    call genKnightMovesW(gameBoard, file, rank, outMoves, outN)
+                    call genRookMovesW(gameBoard, file, rank, outMoves, outN)
+                    call genBishopMovesW(gameBoard, file, rank, outMoves, outN)
+                    call genQueenMovesW(gameBoard, file, rank, outMoves, outN)
+                else
+                    call genPawnMovesB(gameBoard, file, rank, outMoves, outN)
+                    call genKingMovesB(gameBoard, file, rank, outMoves, outN)
+                    call genKnightMovesB(gameBoard, file, rank, outMoves, outN)
+                    call genRookMovesB(gameBoard, file, rank, outMoves, outN)
+                    call genBishopMovesB(gameBoard, file, rank, outMoves, outN)
+                    call genQueenMovesB(gameBoard, file, rank, outMoves, outN)
+                end if
+            end do
+        end do
+        
+        call filterLegalMoves(gameBoard, outMoves, outN, sideColor)
+    end subroutine genAllMoves
 
 
     subroutine genPawnMovesW(gameBoard, fileP, rankP, legalMoves, numMoves)

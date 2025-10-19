@@ -640,15 +640,16 @@ contains
             end do
         end do 
     end subroutine evalPos
-    recursive function negamax(gameBoard, sideColor, legalMoves, nMoves, depth, outBestMove) result(score)
+    recursive function negamax(gameBoard, sideColor, legalMoves, nMoves, depth, alpha, beta, outBestMove) result(score)
         implicit none
         character(len=1), intent(in) :: gameBoard(8,8)
         character(len=*), intent(in) :: sideColor
         character(len=5), intent(in) :: legalMoves(:)
         integer, intent(in) :: nMoves, depth
         character(len=5), intent(out) :: outBestMove
-        real :: score
+        real, intent(in) :: alpha, beta
 
+        real :: score
         real, parameter :: MATE_SCORE = 1.0e6
         real, parameter :: STALEMATE_SCORE = 0.0
         logical :: inCheck
@@ -665,6 +666,11 @@ contains
 
         logical :: wK_old, wQ_old, bK_old, bQ_old
         logical :: wK_new, wQ_new, bK_new, bQ_new
+        real :: a, b
+
+        a = alpha
+        b = beta
+
 
         outBestMove = ''
         score = 0.0
@@ -689,7 +695,6 @@ contains
             call evalPos(gameBoard, score)
             return
         end if
-
         bestScore = -1.0e30
 
         do i = 1, nMoves
@@ -730,15 +735,19 @@ contains
             blackCanCastleKingside = bK_old
             blackCanCastleQueenside = bQ_old
 
-            curScore = -negamax(tmpBoard, oppositeColor, childMoves, childN, depth-1, dummyMove)
+            curScore = -negamax(tmpBoard, oppositeColor, childMoves, childN, depth-1, -b, -a, dummyMove)
 
             if (curScore > bestScore) then
                 bestScore = curScore
                 outBestMove = candidateMove
             end if
+
+            if (bestScore > a) a = bestScore
+            if (a >= b) exit   
         end do
 
         score = bestScore
+
     end function negamax
 
     recursive subroutine lookIntoFuture(gameBoard, legalMoves, nMoves, engineMove, engineColor, depth)
@@ -761,7 +770,7 @@ contains
             return
         end if
 
-        score = negamax(gameBoard, trim(engineColor), legalMoves, nMoves, depth, bestMoveLocal)
+        score = negamax(gameBoard, trim(engineColor), legalMoves, nMoves, depth,-1.0e30, 1.0e30, bestMoveLocal)
 
         engineMove = bestMoveLocal
     end subroutine lookIntoFuture

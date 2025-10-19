@@ -22,6 +22,8 @@ program FortranUCI
             call init_state()
         case ("position")
             call handle_position(trim(line))
+        case("d")
+            call printBoard(board)
         case ("go")
             depth = parse_depth(line)
             if (depth <= 0) depth = 3
@@ -39,6 +41,17 @@ program FortranUCI
         end select
     end do
 contains
+    subroutine printBoard(board)
+        implicit none
+        character(len=1), intent(in) :: board(8,8)
+        integer :: r, f
+
+        do r = 8,1,-1
+            write(*,'(I1, " |", 8(A2))') r, ( " " // board(r,f), f=1,8 )
+        end do
+        write(*,'("    a b c d e f g h")')
+    end subroutine printBoard
+
     subroutine init_state()
         
         call initBoard(board)

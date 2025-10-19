@@ -410,179 +410,187 @@
             nMoves = outIdx
         end subroutine filterLegalMoves
 
-        subroutine evalPos(board, posEval)
-            character(len=1), intent(in) :: board(8,8)
-            real, intent(inout) :: posEval
-            integer :: f, r
+       subroutine evalPos(board, posEval)
+    character(len=1), intent(in) :: board(8,8)
+    real, intent(out) :: posEval
+    integer :: f, r
 
-            real, parameter :: knightValuesW(8,8) = reshape( &
-                [2.1, 2.3, 2.4, 2.4, 2.4, 2.4, 2.3, 2.1, &
-                2.3, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.3, &
-                2.4, 3.0, 3.2, 3.2, 3.2, 3.2, 3.0, 2.4, &
-                2.4, 3.0, 3.2, 4.0, 4.0, 3.2, 3.0, 2.4, &
-                2.4, 3.0, 3.2, 4.0, 4.0, 3.2, 3.0, 2.4, &
-                2.4, 3.0, 3.2, 3.2, 3.2, 3.2, 3.0, 2.4, &
-                2.3, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.3, &
-                2.1, 2.3, 2.4, 2.4, 2.4, 2.4, 2.3, 2.1], [8,8] )
-                
-            do f = 1,8
-                do r = 1,8
-                
-                    select case (board(r,f))
-                        case ('P')
-                            posEval = posEval + 1
-                        case ('R')
-                            posEval = posEval + 4
-                        case ('B')
-                            posEval = posEval + 3
-                        case ('N')
-                            posEval = posEval + knightValuesW(f,r)  
-                        case ('Q')
-                            posEval = posEval + 8
-                        case ('p')
-                            posEval = posEval - 1
-                        case ('r')
-                            posEval = posEval - 4
-                        case ('b')
-                            posEval = posEval - 3
-                        case ('n')
-                            posEval = posEval - knightValuesW(f,r) 
-                        
-                        case ('q')
-                            posEval = posEval - 8
+   
+
+    real, parameter :: knightValuesW(8,8) = reshape( &
+        [2.1, 2.3, 2.4, 2.4, 2.4, 2.4, 2.3, 2.1, &
+         2.3, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.3, &
+         2.4, 3.0, 3.2, 3.2, 3.2, 3.2, 3.0, 2.4, &
+         2.4, 3.0, 3.2, 4.0, 4.0, 3.2, 3.0, 2.4, &
+         2.4, 3.0, 3.2, 4.0, 4.0, 3.2, 3.0, 2.4, &
+         2.4, 3.0, 3.2, 3.2, 3.2, 3.2, 3.0, 2.4, &
+         2.3, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.3, &
+         2.1, 2.3, 2.4, 2.4, 2.4, 2.4, 2.3, 2.1], [8,8] )
+    posEval = 0.0
+
+    do r = 1,8       
+        do f = 1,8    
+            select case (board(r,f))
+                case ('P')
+                    posEval = posEval + 1.0
+                case ('R')
+                    posEval = posEval + 4.0
+                case ('B')
+                    posEval = posEval + 3.0
+                case ('N')
+                    posEval = posEval + knightValuesW(r,f)
+                case ('Q')
+                    posEval = posEval + 8.0
+
+                case ('p')
+                    posEval = posEval - 1.0
+                case ('r')
+                    posEval = posEval - 4.0
+                case ('b')
+                    posEval = posEval - 3.0
+                case ('n')
+                    posEval = posEval - knightValuesW(9-r,f) 
+                case ('q')
+                    posEval = posEval - 8.0
+            end select
+        end do
+    end do
+end subroutine evalPos
+
+        recursive function negamax(gameBoard, sideColor, legalMoves, nMoves, depth, alpha, beta, outBestMove) result(score)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        character(len=*), intent(in) :: sideColor
+        character(len=5), intent(in) :: legalMoves(:)
+        integer, intent(in) :: nMoves, depth
+        character(len=5), intent(out) :: outBestMove
+        real, intent(in) :: alpha, beta
+
+        real :: score
+        real, parameter :: MATE_SCORE = 1.0e6
+        real, parameter :: STALEMATE_SCORE = 0.0
+        logical :: inCheck
+        character(len=1) :: tmpBoard(8,8)
+        character(len=5) :: childMoves(218)
+        integer :: childN
+        integer :: i, cf, cr, gf, gr
+        logical :: valid
+        character(len=1) :: pieceToMove
+        real :: bestScore, curScore
+        character(len=5) :: candidateMove
+        character(len=5) :: oppositeColor
+        character(len=5) :: dummyMove
+
+        logical :: wK_old, wQ_old, bK_old, bQ_old
+        logical :: wK_new, wQ_new, bK_new, bQ_new
+        real :: a, b
+
+        a = alpha
+        b = beta
 
 
-                    end select
-                
+        outBestMove = ''
+        score = 0.0
 
-                end do
-            end do 
-        end subroutine evalPos
-        recursive function negamax(gameBoard, sideColor, legalMoves, nMoves, depth, outBestMove) result(score)
-            implicit none
-            character(len=1), intent(in) :: gameBoard(8,8)
-            character(len=*), intent(in) :: sideColor
-            character(len=5), intent(in) :: legalMoves(:)
-            integer, intent(in) :: nMoves, depth
-            character(len=5), intent(out) :: outBestMove
-            real :: score
+        if (trim(sideColor) == 'White') then
+            oppositeColor = 'Black'
+        else
+            oppositeColor = 'White'
+        end if
 
-            real, parameter :: MATE_SCORE = 1.0e6
-            real, parameter :: STALEMATE_SCORE = 0.0
-            logical :: inCheck
-            character(len=1) :: tmpBoard(8,8)
-            character(len=5) :: childMoves(218)
-            integer :: childN
-            integer :: i, cf, cr, gf, gr
-            logical :: valid
-            character(len=1) :: pieceToMove
-            real :: bestScore, curScore
-            character(len=5) :: candidateMove
-            character(len=5) :: oppositeColor
-            character(len=5) :: dummyMove
-
-            logical :: wK_old, wQ_old, bK_old, bQ_old
-            logical :: wK_new, wQ_new, bK_new, bQ_new
-
-            outBestMove = ''
-            score = 0.0
-
-            if (trim(sideColor) == 'White') then
-                oppositeColor = 'Black'
+        call isInCheck(gameBoard, sideColor, inCheck)
+        if (nMoves == 0) then
+            if (inCheck) then
+                score = -MATE_SCORE + depth
             else
-                oppositeColor = 'White'
+                score = STALEMATE_SCORE
+            end if
+            return
+        end if
+
+        if (depth <= 0) then
+            call evalPos(gameBoard, score)
+            return
+        end if
+        bestScore = -1.0e30
+
+        do i = 1, nMoves
+            candidateMove = trim(legalMoves(i))
+            if (candidateMove == '') cycle
+            call parseMoveAndValidate(candidateMove, legalMoves, nMoves, cf, cr, gf, gr, valid, promo)
+            if (.not. valid) cycle
+
+            tmpBoard = gameBoard
+            pieceToMove = tmpBoard(cr, cf)
+            if (promo /= ' ') then
+                call makeMoveSim(tmpBoard, cf, cr, gf, gr, pieceToMove, promo)
+            else
+                call makeMoveSim(tmpBoard, cf, cr, gf, gr, pieceToMove)
             end if
 
-            call isInCheck(gameBoard, sideColor, inCheck)
-            if (nMoves == 0) then
-                if (inCheck) then
-                    score = -MATE_SCORE + depth
-                else
-                    score = STALEMATE_SCORE
-                end if
-                return
+            wK_old = whiteCanCastleKingside
+            wQ_old = whiteCanCastleQueenside
+            bK_old = blackCanCastleKingside
+            bQ_old = blackCanCastleQueenside
+
+            wK_new = wK_old; wQ_new = wQ_old
+            bK_new = bK_old; bQ_new = bQ_old
+            call updateCastleRightsForMove(gameBoard, cf, cr, gf, gr, pieceToMove, &
+                wK_new, wQ_new, bK_new, bQ_new)
+
+            whiteCanCastleKingside = wK_new
+            whiteCanCastleQueenside = wQ_new
+            blackCanCastleKingside = bK_new
+            blackCanCastleQueenside = bQ_new
+
+            childMoves = ''
+            childN = 0
+            call genAllMoves(tmpBoard, oppositeColor, childMoves, childN)
+
+            whiteCanCastleKingside = wK_old
+            whiteCanCastleQueenside = wQ_old
+            blackCanCastleKingside = bK_old
+            blackCanCastleQueenside = bQ_old
+
+            curScore = -negamax(tmpBoard, oppositeColor, childMoves, childN, depth-1, -b, -a, dummyMove)
+
+            if (curScore > bestScore) then
+                bestScore = curScore
+                outBestMove = candidateMove
             end if
 
-            if (depth <= 0) then
-                call evalPos(gameBoard, score)
-                return
-            end if
+            if (bestScore > a) a = bestScore
+            if (a >= b) exit   
+        end do
 
-            bestScore = -1.0e30
+        score = bestScore
 
-            do i = 1, nMoves
-                candidateMove = trim(legalMoves(i))
-                if (candidateMove == '') cycle
-                call parseMoveAndValidate(candidateMove, legalMoves, nMoves, cf, cr, gf, gr, valid, promo)
-                if (.not. valid) cycle
+    end function negamax
 
-                tmpBoard = gameBoard
-                pieceToMove = tmpBoard(cr, cf)
-                if (promo /= ' ') then
-                    call makeMoveSim(tmpBoard, cf, cr, gf, gr, pieceToMove, promo)
-                else
-                    call makeMoveSim(tmpBoard, cf, cr, gf, gr, pieceToMove)
-                end if
+    recursive subroutine lookIntoFuture(gameBoard, legalMoves, nMoves, engineMove, engineColor, depth)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        character(len=5), intent(in) :: legalMoves(:)
+        integer, intent(in) :: nMoves
+        character(len=5), intent(inout) :: engineMove
+        character(len=5), intent(in) :: engineColor
+        integer, intent(in) :: depth
 
-                wK_old = whiteCanCastleKingside
-                wQ_old = whiteCanCastleQueenside
-                bK_old = blackCanCastleKingside
-                bQ_old = blackCanCastleQueenside
+        real :: score
+        character(len=5) :: bestMoveLocal
 
-                wK_new = wK_old; wQ_new = wQ_old
-                bK_new = bK_old; bQ_new = bQ_old
-                call updateCastleRightsForMove(gameBoard, cf, cr, gf, gr, pieceToMove, &
-                    wK_new, wQ_new, bK_new, bQ_new)
+        engineMove = ''
+        bestMoveLocal = ''
+        score = 0.0
 
-                whiteCanCastleKingside = wK_new
-                whiteCanCastleQueenside = wQ_new
-                blackCanCastleKingside = bK_new
-                blackCanCastleQueenside = bQ_new
+        if (nMoves <= 0) then
+            return
+        end if
 
-                childMoves = ''
-                childN = 0
-                call genAllMoves(tmpBoard, oppositeColor, childMoves, childN)
+        score = negamax(gameBoard, trim(engineColor), legalMoves, nMoves, depth,-1.0e30, 1.0e30, bestMoveLocal)
 
-                whiteCanCastleKingside = wK_old
-                whiteCanCastleQueenside = wQ_old
-                blackCanCastleKingside = bK_old
-                blackCanCastleQueenside = bQ_old
-
-                curScore = -negamax(tmpBoard, oppositeColor, childMoves, childN, depth-1, dummyMove)
-
-                if (curScore > bestScore) then
-                    bestScore = curScore
-                    outBestMove = candidateMove
-                end if
-            end do
-
-            score = bestScore
-        end function negamax
-
-        recursive subroutine lookIntoFuture(gameBoard, legalMoves, nMoves, engineMove, engineColor, depth)
-            implicit none
-            character(len=1), intent(in) :: gameBoard(8,8)
-            character(len=5), intent(in) :: legalMoves(:)
-            integer, intent(in) :: nMoves
-            character(len=5), intent(inout) :: engineMove
-            character(len=5), intent(in) :: engineColor
-            integer, intent(in) :: depth
-
-            real :: score
-            character(len=5) :: bestMoveLocal
-
-            engineMove = ''
-            bestMoveLocal = ''
-            score = 0.0
-
-            if (nMoves <= 0) then
-                return
-            end if
-
-            score = negamax(gameBoard, trim(engineColor), legalMoves, nMoves, depth, bestMoveLocal)
-
-            engineMove = bestMoveLocal
-        end subroutine lookIntoFuture
+        engineMove = bestMoveLocal
+    end subroutine lookIntoFuture
 
         subroutine genAllMoves(gameBoard, sideColor, outMoves, outN)
             implicit none

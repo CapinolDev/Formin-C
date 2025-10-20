@@ -5,7 +5,7 @@ program FortranUCI
     character(len=512) :: line
     logical :: running
     integer :: p, depth
-    character(len=5) :: bestMove
+    integer :: bestMove  ! Change from character to integer
 
     call init_state()
 
@@ -32,7 +32,8 @@ program FortranUCI
                 call write_line("bestmove 0000")
             else
                 call lookIntoFuture(board, legalMoves, nMoves, bestMove, playingPlayer, depth)
-                call write_line("bestmove "//trim(bestMove))
+                call moveToUci(bestMove, line)  ! Convert integer bestMove to UCI string
+                call write_line("bestmove "//trim(line))
             end if
         case ("quit")
             running = .false.
@@ -53,7 +54,6 @@ contains
     end subroutine printBoard
 
     subroutine init_state()
-        
         call initBoard(board)
         whiteCanCastleKingside  = .true.
         whiteCanCastleQueenside = .true.
@@ -61,7 +61,7 @@ contains
         blackCanCastleQueenside = .true.
         playingPlayer = 'White'
         nMoves = 0
-        legalMoves = ''
+        legalMoves = 0   ! Empty legalMoves (array of integers)
     end subroutine init_state
 
     subroutine uci_id()
@@ -75,12 +75,10 @@ contains
         integer :: posMoves, i, start, stop
         character(len=16) :: tok
 
-       
         if (index(cmd, "startpos") > 0) then
             call init_state()
             posMoves = index(cmd, "moves")
             if (posMoves > 0) then
-                
                 start = posMoves + len("moves")
                 do
                     call next_token(cmd, start, tok, stop)
@@ -95,7 +93,6 @@ contains
     end subroutine handle_position
 
     subroutine apply_uci_move(m)
-        
         character(len=*), intent(in) :: m
         integer :: cf, cr, gf, gr
         character(len=1) :: promoC, piece
@@ -116,7 +113,6 @@ contains
             call makeMove(board, cf, cr, gf, gr, piece)
         end if
 
-       
         if (playingPlayer == 'White') then
             playingPlayer = 'Black'
         else

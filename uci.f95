@@ -5,7 +5,7 @@ program FortranUCI
     character(len=512) :: line
     logical :: running
     integer :: p, depth
-    integer :: bestMove  ! Change from character to integer
+    integer :: bestMove  
 
     call init_state()
 
@@ -32,7 +32,7 @@ program FortranUCI
                 call write_line("bestmove 0000")
             else
                 call lookIntoFuture(board, legalMoves, nMoves, bestMove, playingPlayer, depth)
-                call moveToUci(bestMove, line)  ! Convert integer bestMove to UCI string
+                call moveToUci(bestMove, line)  
                 call write_line("bestmove "//trim(line))
             end if
         case ("quit")
@@ -61,7 +61,7 @@ contains
         blackCanCastleQueenside = .true.
         playingPlayer = 'White'
         nMoves = 0
-        legalMoves = 0   ! Empty legalMoves (array of integers)
+        legalMoves = 0   
     end subroutine init_state
 
     subroutine uci_id()

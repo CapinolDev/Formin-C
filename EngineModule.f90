@@ -510,6 +510,7 @@ end subroutine evalPos
 
         if (depth <= 0) then
             call evalPos(gameBoard, score)
+            if (trim(sideColor) == "Black") score = -score
             return
         end if
         bestScore = -1.0e30
@@ -547,12 +548,14 @@ end subroutine evalPos
             childN = 0
             call genAllMoves(tmpBoard, oppositeColor, childMoves, childN)
 
+             curScore = -negamax(tmpBoard, oppositeColor, childMoves, childN, depth-1, -b, -a, dummyMove)
+
             whiteCanCastleKingside = wK_old
             whiteCanCastleQueenside = wQ_old
             blackCanCastleKingside = bK_old
             blackCanCastleQueenside = bQ_old
 
-            curScore = -negamax(tmpBoard, oppositeColor, childMoves, childN, depth-1, -b, -a, dummyMove)
+           
 
             if (curScore > bestScore) then
                 bestScore = curScore

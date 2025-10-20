@@ -597,6 +597,9 @@ contains
         real, intent(inout) :: posEval
         integer :: f, r
 
+        
+
+
         real, parameter :: knightValuesW(8,8) = reshape( &
             [2.1, 2.3, 2.4, 2.4, 2.4, 2.4, 2.3, 2.1, &
             2.3, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.3, &
@@ -607,6 +610,8 @@ contains
             2.3, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.3, &
             2.1, 2.3, 2.4, 2.4, 2.4, 2.4, 2.3, 2.1], [8,8] )
             
+        posEval = 0.0
+        
         do f = 1,8
             do r = 1,8
                
@@ -693,6 +698,7 @@ contains
 
         if (depth <= 0) then
             call evalPos(gameBoard, score)
+            if (trim(sideColor) == "Black") score = -score
             return
         end if
         bestScore = -1.0e30

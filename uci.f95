@@ -26,7 +26,7 @@ program FortranUCI
             call printBoard(board)
         case ("go")
             depth = parse_depth(line)
-            if (depth <= 0) depth = 3
+            if (depth <= 0) depth = 4
             call genAllMoves(board, playingPlayer, legalMoves, nMoves)
             if (nMoves <= 0) then
                 call write_line("bestmove 0000")

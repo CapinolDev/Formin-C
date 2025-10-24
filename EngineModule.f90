@@ -506,7 +506,7 @@
 
    
 
-    real, parameter :: knightValuesW(8,8) = reshape( &
+    real, parameter :: knightValues(8,8) = reshape( &
         [2.1, 2.3, 2.4, 2.4, 2.4, 2.4, 2.3, 2.1, &
          2.3, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.3, &
          2.4, 3.0, 3.2, 3.2, 3.2, 3.2, 3.0, 2.4, &
@@ -515,32 +515,51 @@
          2.4, 3.0, 3.2, 3.2, 3.2, 3.2, 3.0, 2.4, &
          2.3, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.3, &
          2.1, 2.3, 2.4, 2.4, 2.4, 2.4, 2.3, 2.1], [8,8] )
+        
+    real, parameter :: pawnValuesW(8,8) = reshape( &
+        [7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, &
+        4.0, 4.0, 5.0, 6.0, 6.0, 5.0, 4.0, 4.0, &
+        3.0, 3.0, 4.0, 5.0, 5.0, 4.0, 3.0, 3.0, &
+        2.0, 2.0, 3.0, 4.0, 4.0, 3.0, 2.0, 2.0, &
+        1.5, 1.5, 2.0, 3.0, 3.0, 2.0, 1.4, 1.4, &
+        1.3, 1.3, 1.4, 1.5, 1.5, 1.4, 1.3, 1.3, &
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, &
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [8,8] )
+    real, parameter :: pawnValuesB(8,8) = reshape( &
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, &
+        1.3, 1.3, 1.4, 1.5, 1.5, 1.4, 1.3, 1.3, &
+        1.5, 1.5, 2.0, 3.0, 3.0, 2.0, 1.5, 1.5, &
+        2.0, 2.0, 3.0, 4.0, 4.0, 3.0, 2.0, 2.0, &
+        3.0, 3.0, 4.0, 5.0, 5.0, 4.0, 3.0, 3.0, &
+        4.0, 4.0, 5.0, 6.0, 6.0, 5.0, 4.0, 4.0, &
+        7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0], [8,8] )        
     posEval = 0.0
 
     do r = 1,8       
         do f = 1,8    
             select case (board(r,f))
                 case ('P')
-                    posEval = posEval + 1.0
+                    posEval = posEval + pawnValuesW(r,f)
                 case ('R')
-                    posEval = posEval + 4.0
+                    posEval = posEval + 5.0 * 5
                 case ('B')
-                    posEval = posEval + 3.0
+                    posEval = posEval + 3.0 * 3
                 case ('N')
-                    posEval = posEval + knightValuesW(r,f)
+                    posEval = posEval + knightValues(r,f)*3
                 case ('Q')
-                    posEval = posEval + 8.0
+                    posEval = posEval + 8.0 * 8
 
                 case ('p')
-                    posEval = posEval - 1.0
+                    posEval = posEval - pawnValuesB(r, f)
                 case ('r')
-                    posEval = posEval - 4.0
+                    posEval = posEval - 5.0 * 5
                 case ('b')
-                    posEval = posEval - 3.0
+                    posEval = posEval - 3.0 * 3
                 case ('n')
-                    posEval = posEval - knightValuesW(9-r,f) 
+                    posEval = posEval - knightValues(r,f)*3
                 case ('q')
-                    posEval = posEval - 8.0
+                    posEval = posEval - 8.0 * 8
             end select
         end do
     end do
@@ -1005,7 +1024,7 @@ subroutine genRookMovesW(gameBoard, fileR, rankR, legalMoves, numMoves)
     integer, intent(inout) :: numMoves
     integer :: df, dr, newFile, newRank
 
-    if (gameBoard(rankR,fileR) /= 'R') return
+    if (gameBoard(rankR,fileR) /= 'R' .and. gameBoard(rankR, fileR) /= 'Q') return
     do df=-1,1,2
         newFile=fileR
         do
@@ -1035,7 +1054,7 @@ subroutine genRookMovesB(gameBoard, fileR, rankR, legalMoves, numMoves)
     integer, intent(inout) :: numMoves
     integer :: df, dr, newFile, newRank
 
-    if (gameBoard(rankR,fileR) /= 'r') return
+    if (gameBoard(rankR,fileR) /= 'r' .and. gameBoard(rankR,fileR) /= 'q') return
     do df=-1,1,2
         newFile=fileR
         do
@@ -1065,7 +1084,7 @@ subroutine genBishopMovesW(gameBoard, fileB, rankB, legalMoves, numMoves)
     integer, intent(inout) :: numMoves
     integer :: df, dr, newFile, newRank
 
-    if (gameBoard(rankB,fileB) /= 'B') return
+    if (gameBoard(rankB,fileB) /= 'B' .and. gameBoard(rankB,fileB) /= 'Q') return
     do df=-1,1,2
         do dr=-1,1,2
             newFile=fileB
@@ -1090,7 +1109,7 @@ subroutine genBishopMovesB(gameBoard, fileB, rankB, legalMoves, numMoves)
     integer, intent(inout) :: numMoves
     integer :: df, dr, newFile, newRank
 
-    if (gameBoard(rankB,fileB) /= 'b') return
+    if (gameBoard(rankB,fileB) /= 'b' .and. gameBoard(rankB,fileB) /= 'q') return
     do df=-1,1,2
         do dr=-1,1,2
             newFile=fileB
@@ -1120,17 +1139,17 @@ subroutine genQueenMovesW(gameBoard, fileQ, rankQ, legalMoves, numMoves)
     call genBishopMovesW(gameBoard, fileQ, rankQ, legalMoves, numMoves)
 end subroutine genQueenMovesW
 
-subroutine genQueenMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
-    implicit none
-    character(len=1), intent(in) :: gameBoard(8,8)
-    integer, intent(in) :: fileQ, rankQ
-    integer, intent(inout) :: legalMoves(:)
-    integer, intent(inout) :: numMoves
+    subroutine genQueenMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+        implicit none
+        character(len=1), intent(in) :: gameBoard(8,8)
+        integer, intent(in) :: fileQ, rankQ
+        integer, intent(inout) :: legalMoves(:)
+        integer, intent(inout) :: numMoves
 
-    if (gameBoard(rankQ,fileQ) /= 'q') return
-    call genRookMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
-    call genBishopMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
-end subroutine genQueenMovesB
+        if (gameBoard(rankQ,fileQ) /= 'q') return
+        call genRookMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+        call genBishopMovesB(gameBoard, fileQ, rankQ, legalMoves, numMoves)
+    end subroutine genQueenMovesB
 
 
-    end module EngineModule
+end module EngineModule

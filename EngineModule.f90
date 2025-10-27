@@ -18,6 +18,16 @@
         character(len=1) :: promo
         character(len=1) :: pieceToMove
 
+        type :: MoveUndo
+            character(len=1) :: captured
+            character(len=1) :: movedPiece
+            integer :: cf, cr, gf, gr
+            character(len=1) :: promotionPiece
+            logical :: wK, wQ, bK, bQ
+        end type MoveUndo
+
+
+
         integer, parameter :: PROMO_NONE=0, PROMO_Q=1, PROMO_R=2, PROMO_B=3, PROMO_N=4
         
 
@@ -142,6 +152,98 @@
                 list(n) = m
             end if
         end subroutine addMove
+
+        subroutine makeMoveInPlace(board, cf, cr, gf, gr, piece, promotionPiece, wK, wQ, bK, bQ, undo)
+            implicit none
+            character(len=1), intent(inout) :: board(8,8)
+            integer, intent(in) :: cf, cr, gf, gr
+            character(len=1), intent(in) :: piece
+            character(len=1), intent(in), optional :: promotionPiece
+            logical, intent(inout) :: wK, wQ, bK, bQ
+            type(MoveUndo), intent(out) :: undo
+
+            undo%captured = board(gr,gf)
+            undo%movedPiece = piece
+            undo%cf = cf; undo%cr = cr
+            undo%gf = gf; undo%gr = gr
+            if (present(promotionPiece)) then
+                undo%promotionPiece = promotionPiece
+            else
+                undo%promotionPiece = ' '
+            end if
+            undo%wK = wK; undo%wQ = wQ; undo%bK = bK; undo%bQ = bQ
+
+            call updateCastleRightsForMove(board, cf, cr, gf, gr, piece, wK, wQ, bK, bQ)
+
+            if (piece == 'K' .and. cr == 1 .and. cf == 5) then
+                if (gf == 7 .and. gr == 1) then
+                    board(1,5) = ' '; board(1,7) = 'K'
+                    board(1,8) = ' '; board(1,6) = 'R'
+                    return
+                else if (gf == 3 .and. gr == 1) then
+                    board(1,5) = ' '; board(1,3) = 'K'
+                    board(1,1) = ' '; board(1,4) = 'R'
+                    return
+                end if
+            end if
+            if (piece == 'k' .and. cr == 8 .and. cf == 5) then
+                if (gf == 7 .and. gr == 8) then
+                    board(8,5) = ' '; board(8,7) = 'k'
+                    board(8,8) = ' '; board(8,6) = 'r'
+                    return
+                else if (gf == 3 .and. gr == 8) then
+                    board(8,5) = ' '; board(8,3) = 'k'
+                    board(8,1) = ' '; board(8,4) = 'r'
+                    return
+                end if
+            end if
+
+            if (present(promotionPiece)) then
+                board(gr,gf) = promotionPiece
+            else
+                board(gr,gf) = piece
+            end if
+            board(cr,cf) = ' '
+        end subroutine makeMoveInPlace
+
+        subroutine unmakeMove(board, wK, wQ, bK, bQ, undo)
+            implicit none
+            character(len=1), intent(inout) :: board(8,8)
+            logical, intent(inout) :: wK, wQ, bK, bQ
+            type(MoveUndo), intent(in) :: undo
+
+            wK = undo%wK
+            wQ = undo%wQ
+            bK = undo%bK
+            bQ = undo%bQ
+
+            if (undo%movedPiece == 'K' .and. undo%cr == 1 .and. undo%cf == 5) then
+                if (undo%gf == 7 .and. undo%gr == 1) then
+                    board(1,5) = 'K'; board(1,7) = ' '
+                    board(1,8) = 'R'; board(1,6) = ' '
+                    return
+                else if (undo%gf == 3 .and. undo%gr == 1) then
+                    board(1,5) = 'K'; board(1,3) = ' '
+                    board(1,1) = 'R'; board(1,4) = ' '
+                    return
+                end if
+            end if
+            if (undo%movedPiece == 'k' .and. undo%cr == 8 .and. undo%cf == 5) then
+                if (undo%gf == 7 .and. undo%gr == 8) then
+                    board(8,5) = 'k'; board(8,7) = ' '
+                    board(8,8) = 'r'; board(8,6) = ' '
+                    return
+                else if (undo%gf == 3 .and. undo%gr == 8) then
+                    board(8,5) = 'k'; board(8,3) = ' '
+                    board(8,1) = 'r'; board(8,4) = ' '
+                    return
+                end if
+            end if
+
+            board(undo%cr, undo%cf) = undo%movedPiece
+            board(undo%gr, undo%gf) = undo%captured
+        end subroutine unmakeMove
+
 
 
         subroutine initBoard(board)
@@ -567,33 +669,28 @@ end subroutine evalPos
 
     recursive function negamax(gameBoard, sideColor, legalMoves, nMoves, depth, alpha, beta, outBestMove) result(score)
         implicit none
-        character(len=1), intent(in) :: gameBoard(8,8)
+        character(len=1), intent(inout) :: gameBoard(8,8)
         character(len=*), intent(in) :: sideColor
-        integer, intent(in) :: legalMoves(:)   
+        integer, intent(in) :: legalMoves(:)
         integer, intent(in) :: nMoves, depth
-        integer, intent(out) :: outBestMove    
+        integer, intent(out) :: outBestMove
         real, intent(in) :: alpha, beta
 
         real :: score
         real, parameter :: MATE_SCORE = 1.0e6
         real, parameter :: STALEMATE_SCORE = 0.0
         logical :: inCheck
-        character(len=1) :: tmpBoard(8,8)
         integer :: childMoves(218), childN
         integer :: i, cf, cr, gf, gr
-        character(len=1) :: promo
-        character(len=1) :: pieceToMove
-        real :: bestScore, curScore
+        character(len=1) :: promo, pieceToMove
+        real :: bestScore, curScore, a, b
         integer :: candidateMove, dummyMove
         character(len=5) :: oppositeColor
-        logical :: wK_old, wQ_old, bK_old, bQ_old
-        logical :: wK_new, wQ_new, bK_new, bQ_new
-        real :: a, b
+        type(MoveUndo) :: undo
 
         outBestMove = 0
         score = 0.0
-        a = alpha
-        b = beta
+        a = alpha; b = beta
 
         if (trim(sideColor) == 'White') then
             oppositeColor = 'Black'
@@ -624,42 +721,27 @@ end subroutine evalPos
             if (candidateMove == 0) cycle
 
             call unpackMove(candidateMove, cf, cr, gf, gr, promo)
-            tmpBoard = gameBoard
-            pieceToMove = tmpBoard(cr, cf)
-
+            pieceToMove = gameBoard(cr, cf)
             if (promo /= ' ') then
-                call makeMoveSim(tmpBoard, cf, cr, gf, gr, pieceToMove, promo)
+                call makeMoveInPlace(gameBoard, cf, cr, gf, gr, pieceToMove,           &
+                                    promotionPiece=promo,                              &
+                                    wK=whiteCanCastleKingside, wQ=whiteCanCastleQueenside, &
+                                    bK=blackCanCastleKingside, bQ=blackCanCastleQueenside, &
+                                    undo=undo)
             else
-                call makeMoveSim(tmpBoard, cf, cr, gf, gr, pieceToMove)
+                call makeMoveInPlace(gameBoard, cf, cr, gf, gr, pieceToMove,           &
+                                    wK=whiteCanCastleKingside, wQ=whiteCanCastleQueenside, &
+                                    bK=blackCanCastleKingside, bQ=blackCanCastleQueenside, &
+                                    undo=undo)
             end if
 
-            
-            wK_old = whiteCanCastleKingside
-            wQ_old = whiteCanCastleQueenside
-            bK_old = blackCanCastleKingside
-            bQ_old = blackCanCastleQueenside
+            childMoves = 0; childN = 0
+            call genAllMoves(gameBoard, oppositeColor, childMoves, childN)
 
-            wK_new = wK_old; wQ_new = wQ_old
-            bK_new = bK_old; bQ_new = bQ_old
-            call updateCastleRightsForMove(gameBoard, cf, cr, gf, gr, pieceToMove, &
-                wK_new, wQ_new, bK_new, bQ_new)
+            curScore = -negamax(gameBoard, oppositeColor, childMoves, childN, depth-1, -b, -a, dummyMove)
 
-            whiteCanCastleKingside = wK_new
-            whiteCanCastleQueenside = wQ_new
-            blackCanCastleKingside = bK_new
-            blackCanCastleQueenside = bQ_new
-
-            childMoves = 0
-            childN = 0
-            call genAllMoves(tmpBoard, oppositeColor, childMoves, childN)
-
-            curScore = -negamax(tmpBoard, oppositeColor, childMoves, childN, depth-1, -b, -a, dummyMove)
-
-            
-            whiteCanCastleKingside = wK_old
-            whiteCanCastleQueenside = wQ_old
-            blackCanCastleKingside = bK_old
-            blackCanCastleQueenside = bQ_old
+            call unmakeMove(gameBoard, whiteCanCastleKingside, whiteCanCastleQueenside, &
+                            blackCanCastleKingside, blackCanCastleQueenside, undo)
 
             if (curScore > bestScore) then
                 bestScore = curScore
@@ -672,9 +754,10 @@ end subroutine evalPos
 
         score = bestScore
     end function negamax
+
     recursive subroutine lookIntoFuture(gameBoard, legalMoves, nMoves, engineMove, engineColor, depth)
         implicit none
-        character(len=1), intent(in) :: gameBoard(8,8)
+        character(len=1), intent(inout) :: gameBoard(8,8)
         integer, intent(in) :: legalMoves(:)   
         integer, intent(in) :: nMoves
         integer, intent(out) :: engineMove      

@@ -39,7 +39,7 @@ program FortranUCI
             running = .false.
         case default
             
-        end select
+        end select 
     end do
 contains
     subroutine printBoard(board)
